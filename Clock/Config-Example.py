@@ -20,19 +20,24 @@ hourhand = 'images/hourhand.png'
 minhand = 'images/minhand.png'
 sechand = 'images/sechand.png'
 
-# SlideShow
-useslideshow = 0             # 1 to enable, 0 to disable
-slide_time = 305              # in seconds, 3600 per hour
-slides = 'images/slideshow'   # the path to your local images
-slide_bg_color = "#000"       # https://htmlcolorcodes.com/  black #000
+# Map layers for radar
+usemapbox = 1   # 1 = Use Mapbox.com for maps, needs api key (mbapi in ApiKeys.py); 0 = Use Google Maps, needs api key (googleapi in ApiKeys.py)
+map_base = 'bcurley/cj712peyz0bwr2sqfndbggupb'  # Mapbox style for land and water only (bottom layer that goes below weather radar)
+map_overlay = 'bcurley/cj712r01c0bw62rm9isme3j8c'  # Mapbox style for labels, roads, borders, and markers only (top layer that goes above weather radar)
+# Sign-in and create custom map styles at https://www.mapbox.com/studio/styles/
+# Example: If static map URL is 
+# https://api.mapbox.com/styles/v1/mapbox/streets-v10/static/-80.2,25.8,10/600x400?access_token=YOUR-ACCESS-TOKEN
+# use the portion between '/styles/v1/' and '/static/'
+# Standard Mapbox maps will look like 'mapbox/streets-v10'
+# User created Mapbox maps will look like 'user-name/map-identifier'
 
-digital = 0                 # 1 = Digtal Clock, 0 = Analog Clock
+digital = 0             # 1 = Digtal Clock, 0 = Analog Clock
 
 # Goes with light blue config (like the default one)
 digitalcolor = "#50CBEB"
-digitalformat = "{0:%I:%M\n%S %p}"  # Format of the digital clock face
+digitalformat = "{0:%I:%M\n%S %p}"  # The format of the digital time on primary screen
+digitalformat2 = "{0:%H:%M:%S}"  # The format of the digital time on secondary screen
 digitalsize = 200
-
 # The above example shows in this way:
 #  https://github.com/n0bel/PiClock/blob/master/Documentation/Digital%20Clock%20v1.jpg
 # ( specifications of the time string are documented here:
@@ -43,9 +48,6 @@ digitalsize = 200
 #  The above example shows in this way:
 #  https://github.com/n0bel/PiClock/blob/master/Documentation/Digital%20Clock%20v2.jpg
 
-digitalformat2 = "{0:%H:%M:%S}"  # Format of the digital time on second screen
-
-usemapbox = 0   # Use Mapbox.com for maps, needs api key (mbapi in ApiKeys.py)
 metric = 0  # 0 = English, 1 = Metric
 radar_refresh = 10      # minutes
 weather_refresh = 30    # minutes
@@ -109,14 +111,15 @@ Lmoon8 = 'Waning Crecent'
 radar1 = {
     'center': primary_location,  # the center of your radar block
     'zoom': 7,  # this is a maps zoom factor, bigger = smaller area
-    'style': 'mapbox/satellite-streets-v10',  # optional style (mapbox only)
+    'basemap': map_base,  # Mapbox style for land and water only
+    'overlay': map_overlay,  # Mapbox style for labels, roads, borders, and markers only
     'color': 6,  # rainviewer radar color style:
                  # https://www.rainviewer.com/api.html#colorSchemes
     'smooth': 1,  # rainviewer radar smoothing
     'snow': 1,  # rainviewer radar show snow as different color
     'markers': (   # google maps markers can be overlayed
         {
-            'visible': 1,  # 0 = hide marker, 1 = show marker
+            'visible': 1, # 0 = hide marker, 1 = show marker
             'location': primary_location,
             'color': 'red',
             'size': 'small',
@@ -129,8 +132,9 @@ radar1 = {
 radar2 = {
     'center': primary_location,
     'zoom': 11,
-    'style': 'mapbox/satellite-streets-v10',
-    'color': 6,
+    'basemap': map_base,
+    'overlay': map_overlay,
+    'color': 6, 
     'smooth': 1,
     'snow': 1,
     'markers': (
@@ -148,8 +152,9 @@ radar2 = {
 radar3 = {
     'center': primary_location,
     'zoom': 7,
-    'style': 'mapbox/satellite-streets-v10',
-    'color': 6,
+    'basemap': map_base,
+    'overlay': map_overlay,
+    'color': 6, 
     'smooth': 1,
     'snow': 1,
     'markers': (
@@ -166,8 +171,9 @@ radar3 = {
 radar4 = {
     'center': primary_location,
     'zoom': 11,
-    'style': 'mapbox/satellite-streets-v10',
-    'color': 6,
+    'basemap': map_base,
+    'overlay': map_overlay,
+    'color': 6, 
     'smooth': 1,
     'snow': 1,
     'markers': (

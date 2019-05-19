@@ -9,8 +9,6 @@ import time
 import json
 import locale
 import random
-# import urllib
-# import re
 
 from PyQt4 import QtGui, QtCore, QtNetwork
 from PyQt4.QtGui import QPixmap, QBrush, QColor
@@ -265,7 +263,7 @@ def wxfinished():
                      Config.Lgusting +
                      '%.1f' % (speedm(f['windGust'])) + 'kmh')
         wind2.setText(Config.LFeelslike +
-                      '%.1f' % (tempm(f['apparentTemperature'])) + u'°C')
+                     '%.1f' % (tempm(f['apparentTemperature'])) + u'°C')
         wdate.setText("{0:%H:%M}".format(datetime.datetime.fromtimestamp(
             int(f['time']))))
 # Config.LPrecip1hr + f['precip_1hr_metric'] + 'mm ' +
@@ -278,13 +276,13 @@ def wxfinished():
         wd = bearing(f['windBearing'])
         if Config.wind_degrees:
             wd = str(f['windBearing']) + u'°'
-        wind.setText(Config.LWind +
+        wind.setText(Config.LWind + 
                      wd + ' ' +
                      '%.1f' % (f['windSpeed']) + 'mph' +
                      Config.Lgusting +
                      '%.1f' % (f['windGust']) + 'mph')
-        wind2.setText(Config.LFeelslike +
-                      '%.1f' % (f['apparentTemperature']) + u'°F')
+        wind2.setText(Config.LFeelslike + 
+                     '%.1f' % (f['apparentTemperature']) + u'°F')
         wdate.setText("{0:%H:%M}".format(datetime.datetime.fromtimestamp(
             int(f['time']))))
 # Config.LPrecip1hr + f['precip_1hr_in'] + 'in ' +
@@ -406,7 +404,7 @@ def wxfinished():
 def getwx():
     global wxurl
     global wxreply
-    print "getting current and forecast:" + time.ctime()
+    print "getting current and forecast: " + time.ctime()
     wxurl = 'https://api.darksky.net/forecast/' + \
         ApiKeys.dsapi + \
         '/'
@@ -457,91 +455,6 @@ def qtstart():
     temptimer.timeout.connect(gettemp)
     temptimer.start(1000 * 10 * 60 + random.uniform(1000, 10000))
 
-    if Config.useslideshow:
-        objimage1.start(Config.slide_time)
-
-
-class SS(QtGui.QLabel):
-    def __init__(self, parent, rect, myname):
-        self.myname = myname
-        self.rect = rect
-        QtGui.QLabel.__init__(self, parent)
-
-        self.pause = False
-        self.count = 0
-        self.img_list = []
-        self.img_inc = 1
-
-        self.get_images()
-
-        self.setObjectName("slideShow")
-        self.setGeometry(rect)
-        self.setStyleSheet("#slideShow { background-color: " +
-                           Config.slide_bg_color + "; }")
-        self.setAlignment(Qt.AlignHCenter | Qt.AlignCenter)
-
-    def start(self, interval):
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self.run_ss)
-        self.timer.start(1000 * interval + random.uniform(1, 10))
-        self.run_ss()
-
-    def stop(self):
-        try:
-            self.timer.stop()
-            self.timer = None
-        except Exception:
-            pass
-
-    def run_ss(self):
-        self.get_images()
-        self.switch_image()
-
-    def switch_image(self):
-        if self.img_list:
-            if not self.pause:
-                self.count += self.img_inc
-                if self.count >= len(self.img_list):
-                    self.count = 0
-                self.show_image(self.img_list[self.count])
-                self.img_inc = 1
-
-    def show_image(self, image):
-        image = QtGui.QImage(image)
-
-        bg = QtGui.QPixmap.fromImage(image)
-        self.setPixmap(bg.scaled(
-                self.size(),
-                QtCore.Qt.KeepAspectRatio,
-                QtCore.Qt.SmoothTransformation))
-
-    def get_images(self):
-        self.get_local(Config.slides)
-
-    def play_pause(self):
-        if not self.pause:
-            self.pause = True
-        else:
-            self.pause = False
-
-    def prev_next(self, direction):
-        self.img_inc = direction
-        self.timer.stop()
-        self.switch_image()
-        self.timer.start()
-
-    def get_local(self, path):
-        try:
-            dirContent = os.listdir(path)
-        except OSError:
-            print("path '%s' doesn't exists." % path)
-
-        for each in dirContent:
-            fullFile = os.path.join(path, each)
-            if os.path.isfile(fullFile) and (fullFile.lower().endswith('png')
-               or fullFile.lower().endswith('jpg')):
-                    self.img_list.append(fullFile)
-
 
 class Radar(QtGui.QLabel):
 
@@ -553,8 +466,19 @@ class Radar(QtGui.QLabel):
         self.zoom = radar["zoom"]
         self.point = radar["center"]
         self.radar = radar
-        self.baseurl = self.mapurl(radar, rect)
-        print "map base url: " + self.baseurl
+        
+        self.baseurl = self.mapurl(radar, rect, False)
+        print "map base url for " + self.myname + ": " + self.baseurl
+        
+        mb = 0
+        try:
+            mb = Config.usemapbox
+        except:
+            pass
+        if mb:
+            self.overlayurl = self.mapurl(radar, rect, True)
+            print "map overlay url for " + self.myname + ": " + self.overlayurl
+        
         QtGui.QLabel.__init__(self, parent)
         self.interval = Config.radar_refresh * 60
         self.lastwx = 0
@@ -589,6 +513,11 @@ class Radar(QtGui.QLabel):
         self.wwx.setStyleSheet("#wx { background-color: transparent; }")
         self.wwx.setGeometry(0, 0, rect.width(), rect.height())
 
+        self.overlay = QtGui.QLabel(self)
+        self.overlay.setObjectName("overlay")
+        self.overlay.setStyleSheet("#overlay { background-color: transparent; }")
+        self.overlay.setGeometry(0, 0, rect.width(), rect.height())
+        
         self.wmk = QtGui.QLabel(self)
         self.wmk.setObjectName("mk")
         self.wmk.setStyleSheet("#mk { background-color: transparent; }")
@@ -741,33 +670,53 @@ class Radar(QtGui.QLabel):
         self.frameImages.append({"time": self.getTime, "image": ii3})
         ii3 = None
 
-    def mapurl(self, radar, rect):
+    def mapurl(self, radar, rect, overlayonly):
         mb = 0
         try:
             mb = Config.usemapbox
         except:
             pass
         if mb:
-            return self.mapboxurl(radar, rect)
+            if overlayonly:
+                return self.mapboxoverlayurl(radar, rect)
+            else:
+                return self.mapboxbaseurl(radar, rect)
         else:
             return self.googlemapurl(radar, rect)
 
-    def mapboxurl(self, radar, rect):
+    def mapboxbaseurl(self, radar, rect):
         #  note we're using google maps zoom factor.
         #  Mapbox equivilant zoom is one less
         #  They seem to be using 512x512 tiles instead of 256x256
-        style = 'mapbox/satellite-streets-v10'
-        if 'style' in radar:
-            style = radar['style']
+        basemap = 'mapbox/satellite-streets-v10'
+        if 'basemap' in radar:
+            basemap = radar['basemap']
         return 'https://api.mapbox.com/styles/v1/' + \
-               style + \
+               basemap + \
+               '/static/' + \
+               str(radar['center'].lng) + ',' + \
+               str(radar['center'].lat) + ',' + \
+               str(radar['zoom']-1) + ',0,0/' + \
+               str(rect.width()) + 'x' + str(rect.height()) + \
+               '?access_token=' + ApiKeys.mbapi + \
+               '&attribution=false&logo=false'
+
+    def mapboxoverlayurl(self, radar, rect):
+        #  note we're using google maps zoom factor.
+        #  Mapbox equivilant zoom is one less
+        #  They seem to be using 512x512 tiles instead of 256x256
+        overlay = ''
+        if 'overlay' in radar:
+            overlay = radar['overlay']
+        return 'https://api.mapbox.com/styles/v1/' + \
+               overlay + \
                '/static/' + \
                str(radar['center'].lng) + ',' + \
                str(radar['center'].lat) + ',' + \
                str(radar['zoom']-1) + ',0,0/' + \
                str(rect.width()) + 'x' + str(rect.height()) + \
                '?access_token=' + ApiKeys.mbapi
-
+               
     def googlemapurl(self, radar, rect):
         urlp = []
         if len(ApiKeys.googleapi) > 0:
@@ -797,7 +746,7 @@ class Radar(QtGui.QLabel):
                                                      Qt.KeepAspectRatio,
                                                      Qt.SmoothTransformation)
         self.setPixmap(self.basepixmap)
-
+        
         # make marker pixmap
         self.mkpixmap = QPixmap(self.basepixmap.size())
         self.mkpixmap.fill(Qt.transparent)
@@ -807,7 +756,7 @@ class Radar(QtGui.QLabel):
         painter.fillRect(0, 0, self.mkpixmap.width(),
                          self.mkpixmap.height(), br)
         for marker in self.radar['markers']:
-            if 'visible' not in marker or marker['visible'] == 1:
+            if marker['visible'] == 1:
                 pt = getPoint(marker["location"], self.point, self.zoom,
                               self.rect.width(), self.rect.height())
                 mk2 = QImage()
@@ -839,14 +788,24 @@ class Radar(QtGui.QLabel):
                             r = r * cr
                             g = g * cg
                             b = b * cb
-                            mk2.setPixel(x, y, QColor.fromRgbF(r, g, b, a)
-                                         .rgba())
+                            mk2.setPixel(x, y, QColor.fromRgbF(r, g, b, a).rgba())
                 mk2 = mk2.scaledToHeight(mkh, 1)
                 painter.drawImage(pt.x-mkh/2, pt.y-mkh/2, mk2)
 
         painter.end()
 
         self.wmk.setPixmap(self.mkpixmap)
+
+    def overlayfinished(self):
+        if self.overlayreply.error() != QNetworkReply.NoError:
+            return
+        self.overlaypixmap = QPixmap()
+        self.overlaypixmap.loadFromData(self.overlayreply.readAll())
+        if self.overlaypixmap.size() != self.rect.size():
+            self.overlaypixmap = self.overlaypixmap.scaled(self.rect.size(),
+                                                     Qt.KeepAspectRatio,
+                                                     Qt.SmoothTransformation)
+        self.overlay.setPixmap(self.overlaypixmap)
 
     def getbase(self):
         global manager
@@ -855,10 +814,26 @@ class Radar(QtGui.QLabel):
         QtCore.QObject.connect(self.basereply, QtCore.SIGNAL(
             "finished()"), self.basefinished)
 
+    def getoverlay(self):
+        global manager
+        self.overlayreq = QNetworkRequest(QUrl(self.overlayurl))
+        self.overlayreply = manager.get(self.overlayreq)
+        QtCore.QObject.connect(self.overlayreply, QtCore.SIGNAL(
+            "finished()"), self.overlayfinished)
+
     def start(self, interval=0):
         if interval > 0:
             self.interval = interval
         self.getbase()
+        
+        mb = 0
+        try:
+            mb = Config.usemapbox
+        except:
+            pass
+        if mb:
+            self.getoverlay()
+        
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.rtick)
         self.lastget = time.time() - self.interval + random.uniform(3, 10)
@@ -894,8 +869,6 @@ def myquit(a=0, b=0):
     ctimer.stop()
     wxtimer.stop()
     temptimer.stop()
-    if Config.useslideshow:
-        objimage1.stop()
 
     QtCore.QTimer.singleShot(30, realquit)
 
@@ -947,17 +920,6 @@ class myMain(QtGui.QWidget):
                 nextframe(-1)
             if event.key() == Qt.Key_Right:
                 nextframe(1)
-            if event.key() == Qt.Key_F6:  # Previous Image
-                objimage1.prev_next(-1)
-            if event.key() == Qt.Key_F7:  # Next Image
-                objimage1.prev_next(1)
-            if event.key() == Qt.Key_F8:  # Play/Pause
-                objimage1.play_pause()
-            if event.key() == Qt.Key_F9:  # Foreground Toggle
-                if foreGround.isVisible():
-                    foreGround.hide()
-                else:
-                    foreGround.show()
 
     def mousePressEvent(self, event):
         if type(event) == QtGui.QMouseEvent:
@@ -1067,17 +1029,6 @@ except AttributeError:
     Config.Lmoon7 = 'Third Quarter'
     Config.Lmoon8 = 'Waning Crecent'
 
-try:
-    Config.digitalformat2
-except AttributeError:
-    Config.digitalformat2 = "{0:%H:%M:%S}"
-
-try:
-    Config.useslideshow
-except AttributeError:
-    Config.useslideshow = 0
-
-
 #
 # Check if Mapbox API key is set, and use mapbox if so
 try:
@@ -1126,10 +1077,6 @@ frame1.setStyleSheet("#frame1 { background-color: black; border-image: url(" +
                      Config.background + ") 0 0 0 0 stretch stretch;}")
 frames.append(frame1)
 
-if Config.useslideshow:
-    imgRect = QtCore.QRect(0, 0, width, height)
-    objimage1 = SS(frame1, imgRect, "image1")
-
 frame2 = QtGui.QFrame(w)
 frame2.setObjectName("frame2")
 frame2.setGeometry(0, 0, width, height)
@@ -1146,12 +1093,7 @@ frames.append(frame2)
 # frame3.setVisible(False)
 # frames.append(frame3)
 
-foreGround = QtGui.QFrame(frame1)
-foreGround.setObjectName("foreGround")
-foreGround.setStyleSheet("#foreGround { background-color: transparent; }")
-foreGround.setGeometry(0, 0, width, height)
-
-squares1 = QtGui.QFrame(foreGround)
+squares1 = QtGui.QFrame(frame1)
 squares1.setObjectName("squares1")
 squares1.setGeometry(0, height - yscale * 600, xscale * 340, yscale * 600)
 squares1.setStyleSheet(
@@ -1159,7 +1101,7 @@ squares1.setStyleSheet(
     Config.squares1 +
     ") 0 0 0 0 stretch stretch;}")
 
-squares2 = QtGui.QFrame(foreGround)
+squares2 = QtGui.QFrame(frame1)
 squares2.setObjectName("squares2")
 squares2.setGeometry(width - xscale * 340, 0, xscale * 340, yscale * 900)
 squares2.setStyleSheet(
@@ -1168,7 +1110,7 @@ squares2.setStyleSheet(
     ") 0 0 0 0 stretch stretch;}")
 
 if not Config.digital:
-    clockface = QtGui.QFrame(foreGround)
+    clockface = QtGui.QFrame(frame1)
     clockface.setObjectName("clockface")
     clockrect = QtCore.QRect(
         width / 2 - height * .4,
@@ -1181,15 +1123,15 @@ if not Config.digital:
         Config.clockface +
         ") 0 0 0 0 stretch stretch;}")
 
-    hourhand = QtGui.QLabel(foreGround)
+    hourhand = QtGui.QLabel(frame1)
     hourhand.setObjectName("hourhand")
     hourhand.setStyleSheet("#hourhand { background-color: transparent; }")
 
-    minhand = QtGui.QLabel(foreGround)
+    minhand = QtGui.QLabel(frame1)
     minhand.setObjectName("minhand")
     minhand.setStyleSheet("#minhand { background-color: transparent; }")
 
-    sechand = QtGui.QLabel(foreGround)
+    sechand = QtGui.QLabel(frame1)
     sechand.setObjectName("sechand")
     sechand.setStyleSheet("#sechand { background-color: transparent; }")
 
@@ -1200,7 +1142,7 @@ if not Config.digital:
     secpixmap = QtGui.QPixmap(Config.sechand)
     secpixmap2 = QtGui.QPixmap(Config.sechand)
 else:
-    clockface = QtGui.QLabel(foreGround)
+    clockface = QtGui.QLabel(frame1)
     clockface.setObjectName("clockface")
     clockrect = QtCore.QRect(
         width / 2 - height * .4,
@@ -1229,20 +1171,19 @@ else:
 
 
 radar1rect = QtCore.QRect(3 * xscale, 344 * yscale, 300 * xscale, 275 * yscale)
-objradar1 = Radar(foreGround, Config.radar1, radar1rect, "radar1")
+objradar1 = Radar(frame1, Config.radar1, radar1rect, "radar1")
 
 radar2rect = QtCore.QRect(3 * xscale, 622 * yscale, 300 * xscale, 275 * yscale)
-objradar2 = Radar(foreGround, Config.radar2, radar2rect, "radar2")
+objradar2 = Radar(frame1, Config.radar2, radar2rect, "radar2")
 
 radar3rect = QtCore.QRect(13 * xscale, 50 * yscale, 700 * xscale, 700 * yscale)
 objradar3 = Radar(frame2, Config.radar3, radar3rect, "radar3")
 
-radar4rect = QtCore.QRect(726 * xscale, 50 * yscale,
-                          700 * xscale, 700 * yscale)
+radar4rect = QtCore.QRect(726 * xscale, 50 * yscale, 700 * xscale, 700 * yscale)
 objradar4 = Radar(frame2, Config.radar4, radar4rect, "radar4")
 
 
-datex = QtGui.QLabel(foreGround)
+datex = QtGui.QLabel(frame1)
 datex.setObjectName("datex")
 datex.setStyleSheet("#datex { font-family:sans-serif; color: " +
                     Config.textcolor +
@@ -1276,7 +1217,7 @@ datey2.setStyleSheet("#datey2 { font-family:sans-serif; color: " +
 datey2.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
 datey2.setGeometry(800 * xscale, 840 * yscale, 640 * xscale, 100)
 
-attribution = QtGui.QLabel(foreGround)
+attribution = QtGui.QLabel(frame1)
 attribution.setObjectName("attribution")
 attribution.setStyleSheet("#attribution { " +
                           " background-color: transparent; color: " +
@@ -1290,7 +1231,7 @@ attribution.setAlignment(Qt.AlignTop)
 attribution.setGeometry(6 * xscale, 3 * yscale, 100 * xscale, 100)
 
 ypos = -25
-wxicon = QtGui.QLabel(foreGround)
+wxicon = QtGui.QLabel(frame1)
 wxicon.setObjectName("wxicon")
 wxicon.setStyleSheet("#wxicon { background-color: transparent; }")
 wxicon.setGeometry(75 * xscale, ypos * yscale, 150 * xscale, 150 * yscale)
@@ -1314,7 +1255,7 @@ wxicon2.setStyleSheet("#wxicon2 { background-color: transparent; }")
 wxicon2.setGeometry(0 * xscale, 750 * yscale, 150 * xscale, 150 * yscale)
 
 ypos += 130
-wxdesc = QtGui.QLabel(foreGround)
+wxdesc = QtGui.QLabel(frame1)
 wxdesc.setObjectName("wxdesc")
 wxdesc.setStyleSheet("#wxdesc { background-color: transparent; color: " +
                      Config.textcolor +
@@ -1339,7 +1280,7 @@ wxdesc2.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 wxdesc2.setGeometry(400 * xscale, 800 * yscale, 400 * xscale, 100)
 
 ypos += 25
-temper = QtGui.QLabel(foreGround)
+temper = QtGui.QLabel(frame1)
 temper.setObjectName("temper")
 temper.setStyleSheet("#temper { background-color: transparent; color: " +
                      Config.textcolor +
@@ -1364,7 +1305,7 @@ temper2.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
 temper2.setGeometry(125 * xscale, 780 * yscale, 300 * xscale, 100)
 
 ypos += 80
-press = QtGui.QLabel(foreGround)
+press = QtGui.QLabel(frame1)
 press.setObjectName("press")
 press.setStyleSheet("#press { background-color: transparent; color: " +
                     Config.textcolor +
@@ -1377,7 +1318,7 @@ press.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
 press.setGeometry(3 * xscale, ypos * yscale, 300 * xscale, 100)
 
 ypos += 30
-humidity = QtGui.QLabel(foreGround)
+humidity = QtGui.QLabel(frame1)
 humidity.setObjectName("humidity")
 humidity.setStyleSheet("#humidity { background-color: transparent; color: " +
                        Config.textcolor +
@@ -1390,7 +1331,7 @@ humidity.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
 humidity.setGeometry(3 * xscale, ypos * yscale, 300 * xscale, 100)
 
 ypos += 30
-wind = QtGui.QLabel(foreGround)
+wind = QtGui.QLabel(frame1)
 wind.setObjectName("wind")
 wind.setStyleSheet("#wind { background-color: transparent; color: " +
                    Config.textcolor +
@@ -1403,7 +1344,7 @@ wind.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
 wind.setGeometry(3 * xscale, ypos * yscale, 300 * xscale, 100)
 
 ypos += 20
-wind2 = QtGui.QLabel(foreGround)
+wind2 = QtGui.QLabel(frame1)
 wind2.setObjectName("wind2")
 wind2.setStyleSheet("#wind2 { background-color: transparent; color: " +
                     Config.textcolor +
@@ -1416,7 +1357,7 @@ wind2.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
 wind2.setGeometry(3 * xscale, ypos * yscale, 300 * xscale, 100)
 
 ypos += 20
-wdate = QtGui.QLabel(foreGround)
+wdate = QtGui.QLabel(frame1)
 wdate.setObjectName("wdate")
 wdate.setStyleSheet("#wdate { background-color: transparent; color: " +
                     Config.textcolor +
@@ -1428,7 +1369,7 @@ wdate.setStyleSheet("#wdate { background-color: transparent; color: " +
 wdate.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
 wdate.setGeometry(3 * xscale, ypos * yscale, 300 * xscale, 100)
 
-bottom = QtGui.QLabel(foreGround)
+bottom = QtGui.QLabel(frame1)
 bottom.setObjectName("bottom")
 bottom.setStyleSheet("#bottom { font-family:sans-serif; color: " +
                      Config.textcolor +
@@ -1440,7 +1381,7 @@ bottom.setStyleSheet("#bottom { font-family:sans-serif; color: " +
 bottom.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
 bottom.setGeometry(0, height - 50, width, 50)
 
-temp = QtGui.QLabel(foreGround)
+temp = QtGui.QLabel(frame1)
 temp.setObjectName("temp")
 temp.setStyleSheet("#temp { font-family:sans-serif; color: " +
                    Config.textcolor +
@@ -1455,7 +1396,7 @@ temp.setGeometry(0, height - 100, width, 50)
 
 forecast = []
 for i in range(0, 9):
-    lab = QtGui.QLabel(foreGround)
+    lab = QtGui.QLabel(frame1)
     lab.setObjectName("forecast" + str(i))
     lab.setStyleSheet("QWidget { background-color: transparent; color: " +
                       Config.textcolor +
