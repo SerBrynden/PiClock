@@ -193,7 +193,7 @@ Log into your Pi, (either on the screen or via ssh) (NOT as root)
 You'll be in the home directory of the user pi (/home/pi) by default,
 and this is where we want to be.
 ```
-git clone https://github.com/n0bel/PiClock.git
+git clone https://github.com/SerBrynden/PiClock.git
 ```
 Once that is done, you'll have a new directory called PiClock
 A few commands are needed if you intend to use gpio buttons
