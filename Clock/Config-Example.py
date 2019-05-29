@@ -113,7 +113,7 @@ radar1 = {
     'zoom': 7,  # this is a maps zoom factor, bigger = smaller area
     'basemap': map_base,  # Mapbox style for land and water only
     'overlay': map_overlay,  # Mapbox style for labels, roads, borders, and markers only
-    'color': 6,  # rainviewer radar color style:
+    'color': 4,  # rainviewer radar color style:
                  # https://www.rainviewer.com/api.html#colorSchemes
     'smooth': 1,  # rainviewer radar smoothing
     'snow': 1,  # rainviewer radar show snow as different color
@@ -134,7 +134,7 @@ radar2 = {
     'zoom': 11,
     'basemap': map_base,
     'overlay': map_overlay,
-    'color': 6, 
+    'color': 4, 
     'smooth': 1,
     'snow': 1,
     'markers': (
@@ -154,7 +154,7 @@ radar3 = {
     'zoom': 7,
     'basemap': map_base,
     'overlay': map_overlay,
-    'color': 6, 
+    'color': 4, 
     'smooth': 1,
     'snow': 1,
     'markers': (
@@ -173,7 +173,7 @@ radar4 = {
     'zoom': 11,
     'basemap': map_base,
     'overlay': map_overlay,
-    'color': 6, 
+    'color': 4, 
     'smooth': 1,
     'snow': 1,
     'markers': (
