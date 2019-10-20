@@ -263,7 +263,7 @@ def wxfinished():
                      Config.Lgusting +
                      '%.1f' % (speedm(f['windGust'])) + 'kmh')
         wind2.setText(Config.LFeelslike +
-                     '%.1f' % (tempm(f['apparentTemperature'])) + u'°C')
+                      '%.1f' % (tempm(f['apparentTemperature'])) + u'°C')
         wdate.setText("{0:%H:%M}".format(datetime.datetime.fromtimestamp(
             int(f['time']))))
 # Config.LPrecip1hr + f['precip_1hr_metric'] + 'mm ' +
@@ -276,13 +276,13 @@ def wxfinished():
         wd = bearing(f['windBearing'])
         if Config.wind_degrees:
             wd = str(f['windBearing']) + u'°'
-        wind.setText(Config.LWind + 
+        wind.setText(Config.LWind +
                      wd + ' ' +
                      '%.1f' % (f['windSpeed']) + 'mph' +
                      Config.Lgusting +
                      '%.1f' % (f['windGust']) + 'mph')
-        wind2.setText(Config.LFeelslike + 
-                     '%.1f' % (f['apparentTemperature']) + u'°F')
+        wind2.setText(Config.LFeelslike +
+                      '%.1f' % (f['apparentTemperature']) + u'°F')
         wdate.setText("{0:%H:%M}".format(datetime.datetime.fromtimestamp(
             int(f['time']))))
 # Config.LPrecip1hr + f['precip_1hr_in'] + 'in ' +
@@ -466,10 +466,10 @@ class Radar(QtGui.QLabel):
         self.zoom = radar["zoom"]
         self.point = radar["center"]
         self.radar = radar
-        
+
         self.baseurl = self.mapurl(radar, rect, False)
         print "map base url for " + self.myname + ": " + self.baseurl
-        
+
         mb = 0
         try:
             mb = Config.usemapbox
@@ -478,7 +478,7 @@ class Radar(QtGui.QLabel):
         if mb:
             self.overlayurl = self.mapurl(radar, rect, True)
             print "map overlay url for " + self.myname + ": " + self.overlayurl
-        
+
         QtGui.QLabel.__init__(self, parent)
         self.interval = Config.radar_refresh * 60
         self.lastwx = 0
@@ -515,9 +515,10 @@ class Radar(QtGui.QLabel):
 
         self.overlay = QtGui.QLabel(self)
         self.overlay.setObjectName("overlay")
-        self.overlay.setStyleSheet("#overlay { background-color: transparent; }")
+        self.overlay.setStyleSheet(
+            "#overlay { background-color: transparent; }")
         self.overlay.setGeometry(0, 0, rect.width(), rect.height())
-        
+
         self.wmk = QtGui.QLabel(self)
         self.wmk.setObjectName("mk")
         self.wmk.setStyleSheet("#mk { background-color: transparent; }")
@@ -717,7 +718,7 @@ class Radar(QtGui.QLabel):
                str(radar['zoom']-1) + ',0,0/' + \
                str(rect.width()) + 'x' + str(rect.height()) + \
                '?access_token=' + ApiKeys.mbapi
-               
+
     def googlemapurl(self, radar, rect):
         urlp = []
         if len(ApiKeys.googleapi) > 0:
@@ -747,7 +748,7 @@ class Radar(QtGui.QLabel):
                                                      Qt.KeepAspectRatio,
                                                      Qt.SmoothTransformation)
         self.setPixmap(self.basepixmap)
-        
+
         # make marker pixmap
         self.mkpixmap = QPixmap(self.basepixmap.size())
         self.mkpixmap.fill(Qt.transparent)
@@ -757,7 +758,7 @@ class Radar(QtGui.QLabel):
         painter.fillRect(0, 0, self.mkpixmap.width(),
                          self.mkpixmap.height(), br)
         for marker in self.radar['markers']:
-            if marker['visible'] == 1:
+            if 'visible' not in marker or marker['visible'] == 1:
                 pt = getPoint(marker["location"], self.point, self.zoom,
                               self.rect.width(), self.rect.height())
                 mk2 = QImage()
@@ -789,7 +790,8 @@ class Radar(QtGui.QLabel):
                             r = r * cr
                             g = g * cg
                             b = b * cb
-                            mk2.setPixel(x, y, QColor.fromRgbF(r, g, b, a).rgba())
+                            mk2.setPixel(x, y, QColor.fromRgbF(r, g, b, a)
+                                         .rgba())
                 mk2 = mk2.scaledToHeight(mkh, 1)
                 painter.drawImage(pt.x-mkh/2, pt.y-mkh/2, mk2)
 
@@ -803,9 +805,10 @@ class Radar(QtGui.QLabel):
         self.overlaypixmap = QPixmap()
         self.overlaypixmap.loadFromData(self.overlayreply.readAll())
         if self.overlaypixmap.size() != self.rect.size():
-            self.overlaypixmap = self.overlaypixmap.scaled(self.rect.size(),
-                                                     Qt.KeepAspectRatio,
-                                                     Qt.SmoothTransformation)
+            self.overlaypixmap = self.overlaypixmap.scaled(
+                                            self.rect.size(),
+                                            Qt.KeepAspectRatio,
+                                            Qt.SmoothTransformation)
         self.overlay.setPixmap(self.overlaypixmap)
 
     def getbase(self):
@@ -826,7 +829,7 @@ class Radar(QtGui.QLabel):
         if interval > 0:
             self.interval = interval
         self.getbase()
-        
+
         mb = 0
         try:
             mb = Config.usemapbox
@@ -834,7 +837,7 @@ class Radar(QtGui.QLabel):
             pass
         if mb:
             self.getoverlay()
-        
+
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.rtick)
         self.lastget = time.time() - self.interval + random.uniform(3, 10)
@@ -1030,6 +1033,11 @@ except AttributeError:
     Config.Lmoon7 = 'Third Quarter'
     Config.Lmoon8 = 'Waning Crecent'
 
+try:
+    Config.digitalformat2
+except AttributeError:
+    Config.digitalformat2 = "{0:%H:%M:%S}"
+
 #
 # Check if Mapbox API key is set, and use mapbox if so
 try:
@@ -1180,7 +1188,8 @@ objradar2 = Radar(frame1, Config.radar2, radar2rect, "radar2")
 radar3rect = QtCore.QRect(13 * xscale, 50 * yscale, 700 * xscale, 700 * yscale)
 objradar3 = Radar(frame2, Config.radar3, radar3rect, "radar3")
 
-radar4rect = QtCore.QRect(726 * xscale, 50 * yscale, 700 * xscale, 700 * yscale)
+radar4rect = QtCore.QRect(726 * xscale, 50 * yscale, 700 * xscale,
+                          700 * yscale)
 objradar4 = Radar(frame2, Config.radar4, radar4rect, "radar4")
 
 
