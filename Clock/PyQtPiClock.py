@@ -655,7 +655,7 @@ class Radar(QtGui.QLabel):
         ii = None
         painter2 = QPainter()
         painter2.begin(ii2)
-        timestamp = "{0:%H:%M} rainvewer.com".format(
+        timestamp = "{0:%H:%M} rainviewer.com".format(
                     datetime.datetime.fromtimestamp(self.getTime))
         painter2.setPen(QColor(63, 63, 63, 255))
         painter2.setFont(QFont("Arial", 8))
