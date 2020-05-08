@@ -1,4 +1,18 @@
 # PiClock
+## PiClock Mods
+Fork of PiClock that uses custom dark maps from MapBox with an additional map overlay for the radar windows so that weather does not obscure map information.
+
+The radar windows consist of three layers:
+ - Bottom layer is a plain MapBox dark map with no labels, borders, or roads.
+ - Middle layer is the weather radar imagery.
+ - Top layer is a transparent MapBox map with only labels, borders, and roads.
+
+## Screenshots of PiClock with Dark Maps
+![PiClock with dark maps screen 1](https://raw.githubusercontent.com/SerBrynden/PiClock/master/Pictures/piclock_dark_maps_screen1.png)
+
+![PiClock with dark maps screen 2](https://raw.githubusercontent.com/SerBrynden/PiClock/master/Pictures/piclock_dark_maps_screen2.png)
+
+## Original PiClock
 A Fancy Clock built around a monitor and a Raspberry Pi
 
 ![PiClock Picture](https://raw.githubusercontent.com/SerBrynden/PiClock/master/Pictures/20150307_222711.jpg)
