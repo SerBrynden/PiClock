@@ -1709,12 +1709,12 @@ class Radar(QtWidgets.QLabel):
                     radar['smooth'] = 1
                 if 'snow' not in radar:
                     radar['snow'] = 1
-                tail = '/256/%d/%d/%d/%d/%d_%d.png' % (self.zoom, x, y,
+                tail = '256/%d/%d/%d/%d/%d_%d.png' % (self.zoom, x, y,
                                                        radar['color'],
                                                        radar['smooth'],
                                                        radar['snow'])
                 if 'oldcolor' in radar:
-                    tail = '/256/%d/%d/%d.png?color=%d' % (self.zoom, x, y,
+                    tail = '256/%d/%d/%d.png?color=%d' % (self.zoom, x, y,
                                                            radar['color'])
                 self.tiletails.append(tail)
         for x in range(int(self.cornerTiles['NW']['X']),
@@ -2671,3 +2671,4 @@ w.show()
 w.showFullScreen()
 
 sys.exit(app.exec_())
+
