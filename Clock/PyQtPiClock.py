@@ -1704,7 +1704,7 @@ class Radar(QtWidgets.QLabel):
                 tile = {'X': x, 'Y': y}
                 self.tiles.append(tile)
                 if 'color' not in radar:
-                    radar['color'] = 6
+                    radar['color'] = 2
                 if 'smooth' not in radar:
                     radar['smooth'] = 1
                 if 'snow' not in radar:
