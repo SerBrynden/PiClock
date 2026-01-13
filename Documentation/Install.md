@@ -55,13 +55,19 @@ ping github.com
 go on forever)
 
 ### Get all the software that PiClock needs
-Update the package repository and get the full Python3 and Qt5 for Python
+The latest version of Raspberry Pi OS may already have Git, Python3, and Qt5 for Python installed.
+Check what is installed by typing:
+```
+apt list --installed git python python3 python3-pyqt5
+```
+If these packages are not listed as installed, or the Python version is not 3+, then you need to install them.
+Update the package repository and install Git, Python3, and Qt5 for Python:
 ```
 sudo apt update
-sudo apt install python3-full python3-pyqt5
+sudo apt install git python3-full python3-pyqt5
 ```
 You may need to confirm some things, like:
-After this operation, 59.5 MB of additional disk space will be used.
+After this operation, XX MB of additional disk space will be used.
 Do you want to continue [Y/n]? 
 Go ahead, say yes.
 
@@ -157,39 +163,49 @@ Get optional mpg123 to play NOAA weather radio streams
 sudo apt install mpg123
 ```
 
-### Optional - Editing config.txt
+### Optional - Editing config.txt and modules files
 
-(Only required if you will be using IR Remote control or DS18B20 temperature
- sensors)
+Only required if you will be using IR Remote control or DS18B20 temperature sensors.
 
-Log into your Pi, (either on the screen or via ssh)
+Log into your Pi, (either on the screen or via ssh).
 
-use nano to edit the boot config file
+#### Editing config.txt
+Use nano to edit the boot config file:
 ```
-sudo nano /boot/config.txt
+sudo nano /boot/firmware/config.txt
 ```
-Be sure the lines
+Be sure the following lines are in there somewhere, and occur only once.
+The default config has lirc-rpi commented out (# in front), don't forget to remove the #.
+
+For IR remote control only (lirc-rpi):
 ```
 dtoverlay=lirc-rpi,gpio_in_pin=3,gpio_out_pin=2
+```
+For temperature sensor only (w1-gpio):
+```
 dtoverlay=w1-gpio,gpiopin=4
 ```
-are in there somewhere, and occur only once.
-The default config has lirc-rpi commented out (# in front), don't forget to remove the #
+
 Also add the pin arguments just as shown above, if they are not already there.
 
 You're free to change the pins, but of course the hardware guide will need to
 be adjusted to match.
 
-use nano to edit the modules file
+###### Editing modules file
+Next, use nano to edit the modules file:
 ```
 sudo nano /etc/modules
 ```
-Be sure the lines
+Be sure the following lines are in there somewhere, and occur only once.
+
+For IR remote control only (lirc-rpi):
 ```
 lirc_rpi gpio_in_pin=3 gpio_out_pin=2
+```
+For temperature sensor only (w1-gpio):
+```
 w1-gpio
 ```
-are in there somewhere, and only occur once.
 
 ### Exit virtual environment
 To leave the virtual environment, use the following command
