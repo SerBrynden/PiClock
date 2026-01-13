@@ -23,11 +23,144 @@ from PyQt5.QtGui import QPainter, QImage, QFont
 from PyQt5.QtGui import QPixmap, QBrush, QColor
 from PyQt5.QtNetwork import QNetworkReply
 from PyQt5.QtNetwork import QNetworkRequest
-from timezonefinder import TimezoneFinder
+from tzfpy import get_tz
 
 sys.dont_write_bytecode = True
 from GoogleMercatorProjection import get_corners, get_point, get_tile_xy, LatLng  # NOQA
 import ApiKeys  # NOQA
+
+
+# --- Daily log rotation (at local midnight), keeping PyQtPiClock.1.log ... .7.log ---
+class _DailyRotatingLineLogger:
+    def __init__(self, log_path: str, keep: int = 7, tee_to=None):
+        self.log_path = os.path.abspath(log_path)
+        self.keep = keep
+        self.tee_to = tee_to  # optional stream (e.g., original stdout)
+        self._tz = tzlocal.get_localzone()
+        self._buf = ""
+        self._cur_date = datetime.datetime.now(tz=self._tz).date()
+        self._fh = None
+        self._open_for_today(rotate_on_open=True)
+
+    def _open_for_today(self, rotate_on_open: bool):
+        os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
+        if rotate_on_open and os.path.exists(self.log_path):
+            self._rotate_files()
+        self._fh = open(self.log_path, "a", encoding="utf-8", buffering=1)
+
+    def _rotate_files(self):
+        try:
+            if self._fh:
+                self._fh.flush()
+                self._fh.close()
+        except Exception:
+            pass
+
+        # shift .6 -> .7, ... .1 -> .2, current -> .1 (we always write to .1)
+        for i in range(self.keep, 1, -1):
+            src = self.log_path.replace(".1.log", f".{i - 1}.log")
+            dst = self.log_path.replace(".1.log", f".{i}.log")
+            try:
+                if os.path.exists(dst):
+                    os.remove(dst)
+                if os.path.exists(src):
+                    os.replace(src, dst)
+            except OSError:
+                pass
+
+    def _maybe_rollover(self):
+        today = datetime.datetime.now(tz=self._tz).date()
+        if today != self._cur_date:
+            self._cur_date = today
+            self._rotate_files()
+            self._open_for_today(rotate_on_open=False)
+
+    def _timestamp_prefix(self) -> str:
+        now = datetime.datetime.now(tz=self._tz)
+        return now.strftime("%F %T.%f %Z (UTC%z) - ")
+
+    def write(self, s: str):
+        if not s:
+            return
+        self._maybe_rollover()
+        self._buf += s
+
+        while True:
+            nl = self._buf.find("\n")
+            if nl < 0:
+                break
+            line = self._buf[:nl]
+            self._buf = self._buf[nl + 1:]
+
+            out = self._timestamp_prefix() + line + "\n"
+            try:
+                self._fh.write(out)
+            except Exception:
+                pass
+
+            if self.tee_to is not None:
+                try:
+                    self.tee_to.write(out)
+                except Exception:
+                    pass
+
+    def flush(self):
+        self._maybe_rollover()
+        if self._buf:
+            # flush partial line without forcing a newline
+            try:
+                out = self._timestamp_prefix() + self._buf
+                self._fh.write(out)
+            except Exception:
+                pass
+            if self.tee_to is not None:
+                try:
+                    self.tee_to.write(out)
+                except Exception:
+                    pass
+            self._buf = ""
+        try:
+            if self._fh:
+                self._fh.flush()
+        except Exception:
+            pass
+        if self.tee_to is not None:
+            try:
+                self.tee_to.flush()
+            except Exception:
+                pass
+
+    def close(self):
+        try:
+            self.flush()
+        finally:
+            try:
+                if self._fh:
+                    self._fh.close()
+            except Exception:
+                pass
+
+
+def _setup_daily_log_if_enabled():
+    if os.environ.get("PICLOCK_DAILY_LOG", "").strip() not in ("1", "true", "True", "yes", "YES"):
+        return
+    try:
+        # Expect to be run from Clock/ (startup.sh does cd Clock)
+        log_file = os.path.join(os.getcwd(), "PyQtPiClock.1.log")
+        logger = _DailyRotatingLineLogger(log_file, keep=7, tee_to=None)
+        sys.stdout = logger
+        sys.stderr = logger
+        import atexit
+        atexit.register(logger.close)
+    except Exception:
+        # If anything goes wrong, fall back to normal stdout/stderr.
+        pass
+
+
+_setup_daily_log_if_enabled()
+
+
+# --- end daily log rotation setup ---
 
 
 class SunTimes:
@@ -47,7 +180,7 @@ class SunTimes:
         sunrise_t = SunTimes.__timefromdecimalday(self.sunrise_t)
         # complete datetime of sunrise at local coordinates
         sunrise_dt = datetime.datetime.combine(when.date(), sunrise_t, when.tzinfo)
-        # return datetime of sunrise in designated system timezone
+        # return datetime of sunrise in the designated system timezone
         return sunrise_dt.astimezone(tzlocal.get_localzone())
 
     def sunset(self, when=None):
@@ -1388,10 +1521,8 @@ def getwx_owm():
     global hasMetar
     global owmonecall
     # try OWM One Call once, if it fails, then we go to two calls (current weather and forecast)
-    # older OWM API keys work with legacy One Call API 2.5
-    # newer keys do not work with One Call API 2.5, and require additional subscription to "One Call by Call" plan
     if owmonecall:
-        wxurl = 'https://api.openweathermap.org/data/2.5/onecall?appid=' + \
+        wxurl = 'https://api.openweathermap.org/data/3.0/onecall?appid=' + \
                 ApiKeys.owmapi
     else:
         wxurl = 'https://api.openweathermap.org/data/2.5/forecast?appid=' + \
@@ -1502,9 +1633,17 @@ def qtstart():
             pass
 
     dt = datetime.datetime.now(tz=tzlocal.get_localzone())
-    tf = TimezoneFinder()
-    tzlatlngstr = tf.timezone_at(lng=Config.location.lng, lat=Config.location.lat)
-    tzlatlng = pytz.timezone(tzlatlngstr)
+    tzlatlngstr = get_tz(Config.location.lng, Config.location.lat)
+    if tzlatlngstr:
+        tzlatlng = pytz.timezone(tzlatlngstr)
+    else:
+        tzlatlng = tzlocal.get_localzone()
+        print(
+            "WARNING: tzfpy.get_tz() returned None for lat/lng "
+            f"({Config.location.lat}, {Config.location.lng}); "
+            f"falling back to tzlocal.get_localzone() -> {tzlatlng}"
+        )
+
     sun = SunTimes(Config.location.lat, Config.location.lng, tzlatlng)
     sunrise = sun.sunrise(dt)
     sunset = sun.sunset(dt)
@@ -1710,12 +1849,12 @@ class Radar(QtWidgets.QLabel):
                 if 'snow' not in radar:
                     radar['snow'] = 1
                 tail = '256/%d/%d/%d/%d/%d_%d.png' % (self.zoom, x, y,
-                                                       radar['color'],
-                                                       radar['smooth'],
-                                                       radar['snow'])
+                                                      radar['color'],
+                                                      radar['smooth'],
+                                                      radar['snow'])
                 if 'oldcolor' in radar:
                     tail = '256/%d/%d/%d.png?color=%d' % (self.zoom, x, y,
-                                                           radar['color'])
+                                                          radar['color'])
                 self.tiletails.append(tail)
         for x in range(int(self.cornerTiles['NW']['X']),
                        int(self.cornerTiles['NE']['X']) + 1):
@@ -2671,4 +2810,3 @@ w.show()
 w.showFullScreen()
 
 sys.exit(app.exec_())
-
