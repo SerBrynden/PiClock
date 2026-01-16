@@ -193,7 +193,7 @@ radar1 = {
 
 radar2 = {
     'center': radar_location,
-    'zoom': 11,
+    'zoom': 7,
     'basemap': map_base,
     'overlay': map_overlay,
     'color': 2,
@@ -231,7 +231,7 @@ radar3 = {
 
 radar4 = {
     'center': radar_location,
-    'zoom': 11,
+    'zoom': 7,
     'basemap': map_base,
     'overlay': map_overlay,
     'color': 2,
