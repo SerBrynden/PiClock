@@ -171,9 +171,11 @@ Ltm_code_map = {
 # radar_location,
 # -TO-
 # LatLng(44.9764016,-93.2486732),
+
+# screen 1, top radar
 radar1 = {
     'center': radar_location,  # the center of your radar block
-    'zoom': 7,  # this is a maps zoom factor, bigger = smaller area
+    'zoom': 7,  # this is a maps zoom factor, bigger number = smaller area, max is 7
     'basemap': map_base,  # Mapbox style for standard map or custom map with land and water only
     'overlay': map_overlay,  # Mapbox style for labels, roads, and borders only
     'color': 2,  # rainviewer radar color scheme:
@@ -191,9 +193,10 @@ radar1 = {
     )
 }
 
+# screen 1, bottom radar
 radar2 = {
     'center': radar_location,
-    'zoom': 7,
+    'zoom': 5,
     'basemap': map_base,
     'overlay': map_overlay,
     'color': 2,
@@ -210,6 +213,7 @@ radar2 = {
     )
 }
 
+# screen 2, left radar
 radar3 = {
     'center': radar_location,
     'zoom': 7,
@@ -229,9 +233,10 @@ radar3 = {
     )
 }
 
+# screen 2, right radar
 radar4 = {
     'center': radar_location,
-    'zoom': 7,
+    'zoom': 4,
     'basemap': map_base,
     'overlay': map_overlay,
     'color': 2,
