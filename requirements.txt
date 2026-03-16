@@ -2,4 +2,4 @@ python-dateutil~=2.9.0
 metar~=1.11.0
 pytz~=2026.1
 tzlocal~=5.3.1
-tzfpy~=1.1.1
+tzfpy~=1.1.3
