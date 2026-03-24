@@ -523,11 +523,11 @@ but it is probably not needed.
 ```
 sudo crontab -e
 ```
-add the following line
+add the following line:
 ```
 22 3 * * * /sbin/reboot
 ```
-save the file
+save the file.
 
 This sets the reboot to occur at 3:22am every day.   Adjust as needed.
 
@@ -544,15 +544,18 @@ The update.sh script will then convert any config files as needed.
 
 You'll want to reboot after the update.
 
-Note: If you get errors because you've made changes to the base code you might need
+NOTE: If you get errors when performing `git pull` because you've made 
+manual changes to the base code you might need:
 ```
 git diff
 ```
-To see your changes, so you can back them up
+to see your changes, so you can back them up.
 
-Then this will update to the current version
+Then this will update to the current version:
 ```
 git reset --hard
+git pull
+bash update.sh
 ```
 (This won't bother your Config.py nor ApiKeys.py because they are not tracked in git.)
 
