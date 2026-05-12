@@ -1657,11 +1657,17 @@ def qtstart():
     gettemp()
 
     objradar1.start(Config.radar_refresh * 60)
-    objradar1.wxstart()
     objradar2.start(Config.radar_refresh * 60)
-    objradar2.wxstart()
     objradar3.start(Config.radar_refresh * 60)
     objradar4.start(Config.radar_refresh * 60)
+
+    # Only start wxstart() for radars on the visible startup screen (frame)
+    if Config.startup_screen == 2:
+        objradar3.wxstart()
+        objradar4.wxstart()
+    else:
+        objradar1.wxstart()
+        objradar2.wxstart()
 
     ctimer = QtCore.QTimer()
     ctimer.timeout.connect(tick)
@@ -2333,14 +2339,23 @@ def myquit(signum, frame):
 
 
 def fixupframe(frame, onoff):
-    for child in frame.children():
-        if isinstance(child, Radar):
-            if onoff:
-                # print('INFO: calling wxstart on radar on', frame.objectName())
-                child.wxstart()
+    def find_radars(widget):
+        """Recursively find all Radar objects in the widget tree"""
+        radars = []
+        for child in widget.children():
+            if isinstance(child, Radar):
+                radars.append(child)
             else:
-                # print('INFO: calling wxstop on radar on', frame.objectName())
-                child.wxstop()
+                radars.extend(find_radars(child))
+        return radars
+
+    for radar in find_radars(frame):
+        if onoff:
+            # print('INFO: calling wxstart on ' + radar.myname + ' in ' + frame.objectName())
+            radar.wxstart()
+        else:
+            # print('INFO: calling wxstop on ' + radar.myname + ' in ' + frame.objectName())
+            radar.wxstop()
 
 
 def nextframe(plusminus):
@@ -2511,6 +2526,11 @@ try:
 except AttributeError:
     Config.useslideshow = 0
 
+try:
+    Config.startup_screen
+except AttributeError:
+    Config.startup_screen = 1
+
 # Check if Mapbox API key is set, and use mapbox if so
 usemapbox = 0
 try:
@@ -2552,7 +2572,7 @@ xscale = float(width) / 1440.0
 yscale = float(height) / 900.0
 
 frames = []
-framep = 0
+framep = Config.startup_screen - 1  # Convert from 1-based to 0-based indexing
 
 frame1 = QtWidgets.QFrame(w)
 frame1.setObjectName('frame1')
@@ -2572,6 +2592,15 @@ frame2.setStyleSheet('#frame2 { background-color: black; border-image: url(' +
                      Config.background + ') 0 0 0 0 stretch stretch;}')
 frame2.setVisible(False)
 frames.append(frame2)
+
+# Set visibility based on startup_screen
+if 0 <= framep < len(frames):
+    for i, frame in enumerate(frames):
+        if i == framep:
+            frame.setVisible(True)
+            fixupframe(frame, onoff=True)
+        else:
+            frame.setVisible(False)
 
 foreGround = QtWidgets.QFrame(frame1)
 foreGround.setObjectName('foreGround')
@@ -2785,7 +2814,7 @@ temper2.setStyleSheet('#temper2 { background-color: transparent; color: ' +
                       Config.fontattr +
                       '}')
 temper2.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-temper2.setGeometry(int(125 * xscale), int(780 * yscale), int(300 * xscale), 100)
+temper2.setGeometry(int(125 * xscale), int(780 * yscale), int(300 * xscale), int(100 * yscale))
 
 ypos += 80
 press = QtWidgets.QLabel(foreGround)
