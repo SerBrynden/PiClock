@@ -30,6 +30,9 @@ slide_time = 305  # in seconds, 3600 per hour
 slides = 'images/slideshow'  # the path to your local images
 slide_bg_color = '#000'  # https://htmlcolorcodes.com/  black #000
 
+# Startup screen selection: 1 for screen 1 (clock), 2 for screen 2 (dual radar)
+startup_screen = 1
+
 digital = 0  # 1 = Digital Clock, 0 = Analog Clock
 
 # Goes with light blue config (like the default one)
