@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from PyQt5.QtGui import QColor
 
-from GoogleMercatorProjection import LatLng  # NOQA
+from GoogleMercatorProjection import LatLng
 
 # LOCATION(S)
 # Further radar configuration (zoom, marker location) can be
@@ -52,25 +52,41 @@ digitalsize = 200
 
 digitalformat2 = '{0:%H:%M:%S}'  # Format of the digital time on second screen
 
-# Mapbox map styles, need API key (mbapi in ApiKeys.py)
-# If no Mapbox API is set, Google Maps are used
-map_base = 'bcurley/cj712peyz0bwr2sqfndbggupb'  # Custom dark Mapbox style for land and water only (bottom layer that goes below weather radar)
-map_overlay = 'bcurley/cj712r01c0bw62rm9isme3j8c'  # Custom Mapbox style for labels, roads, and borders only (top layer that goes above weather radar)
-# map_base = 'mapbox/satellite-streets-v12'  # Uncomment for standard Mapbox Satellite Streets style, and comment/remove the custom style
-# map_base = 'mapbox/streets-v12'  # Uncomment for standard Mapbox Streets style, and comment/remove the custom style
-# map_base = 'mapbox/outdoors-v12'  # Uncomment for standard Mapbox Outdoors style, and comment/remove the custom style
-# map_base = 'mapbox/dark-v11'  # Uncomment for standard Mapbox Dark style, and comment/remove the custom style
-# map_base = 'mapbox/cj5l80zrp29942rmtg0zctjto'  # Mapbox calls this map style 'Decimal'
-# map_overlay = ''  # Uncomment and leave blank if using standard Mapbox style, and comment/remove the custom style
+# Map base style.
+#
+# If using Google Maps, map_base is the Google Static Maps map type:
+#   'roadmap', 'satellite', 'terrain', or 'hybrid'
+#
+# If using Mapbox, map_base is the Mapbox classic style id:
+#   'mapbox/satellite-streets-v12'
+#   'mapbox/streets-v12'
+#   'mapbox/outdoors-v12'
+#   'mapbox/dark-v11'
+#   'mapbox/cj5l80zrp29942rmtg0zctjto'  # Mapbox calls this map style 'Decimal'
+#   'user-name/custom-style-id'
+#
+# For more Mapbox styles, see https://docs.mapbox.com/map-styles/guides/classic-styles/
+# To create custom Mapbox style, sign-in at https://www.mapbox.com/mapbox-studio
+#
+# If no Mapbox API key is set, Google Maps are used and require Google API key.
+# If a Mapbox API key is set, Mapbox is used.
+# map_base = 'hybrid'  # Google map type
+# map_base = 'mapbox/satellite-streets-v12'  # Mapbox classic style
+map_base = 'serbrynden/cmtb05qoy000401sk73c24q61'  # Custom Mapbox dark map style without labels, roads, borders, etc.
 
-# For more Mapbox styles, see https://docs.mapbox.com/api/maps/styles/
-# To create custom Mapbox styles, sign-in at https://studio.mapbox.com/
-# Example: If static map URL is
-# https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/-80.2,25.8,10/600x400?access_token=YOUR-ACCESS-TOKEN
-# use the portion between '/styles/v1/' and '/static/'
-# Standard Mapbox maps will look like 'mapbox/streets-v12'
-# User created Mapbox maps will look like 'user-name/map-identifier'
+# Mapbox overlay style.
+#
+# This is only used with Mapbox. Google Maps does not use the overlay layer.
+# Leave blank when using a standard Mapbox style as the complete base map.
+# Set this only when using a custom Mapbox base style that needs labels, roads,
+# borders, etc. drawn above the radar layer.
+map_overlay = 'serbrynden/cmtb066o1000l01snc11ne90m'
 
+userainviewer = 0  # 0 = LibreWXR, 1 = RainViewer (free tier max zoom 7)
+
+# A non-blank api key usually selects the weather service.  Open-Meteo.com doesn't
+# use one, so having no keys selects it.  1 forces it even if you have keys.
+useopenmeteo = 1
 metric = 0  # 0 = English, 1 = Metric
 radar_refresh = 10  # minutes
 weather_refresh = 30  # minutes
@@ -94,15 +110,15 @@ dimcolor.setAlpha(0)
 # But data can be sparse outside US and Europe
 # If you're close to an international airport, you should find something close
 # Find the closest METAR station with the following URL
-# https://www.aviationweather.gov/metar
+# https://www.aviationweather.gov
 # scroll/zoom the map to find your closest station
 # or look up the ICAO code here:
 # https://airportcodes.aero/name
 METAR = ''
 
-# Language specific wording
+# Language-specific wording
 # OpenWeather Language code
-#  (https://openweathermap.org/current#multi)
+#  (https://openweathermap.org/api/current?collection=current_forecast#multi)
 Language = 'EN'
 
 # The Python Locale for date/time (locale.setlocale)
@@ -113,7 +129,7 @@ Language = 'EN'
 # sudo dpkg-reconfigure locales
 DateLocale = ''
 
-# Language specific wording
+# Language-specific wording
 LPressure = 'Pressure '
 LHumidity = 'Humidity '
 LWind = 'Wind '
@@ -136,7 +152,39 @@ Lmoon6 = 'Waning Gibbous'
 Lmoon7 = 'Third Quarter'
 Lmoon8 = 'Waning Crescent'
 
-# Language specific terms for Tomorrow.io weather conditions
+# Language-specific terms for Open-Meteo.com weather conditions
+Lom_code_map = {
+    0: 'Clear',
+    1: 'Mainly Clear',
+    2: 'Partly Cloudy',
+    3: 'Overcast',
+    45: 'Fog',
+    48: 'Freezing Fog',
+    51: 'Light Drizzle',
+    53: 'Drizzle',
+    55: 'Heavy Drizzle',
+    56: 'Light Freezing Drizzle',
+    57: 'Freezing Drizzle',
+    61: 'Light Rain',
+    63: 'Rain',
+    65: 'Heavy Rain',
+    66: 'Light Freezing Rain',
+    67: 'Freezing Rain',
+    71: 'Light Snow',
+    73: 'Snow',
+    75: 'Heavy Snow',
+    77: 'Snow Grains',
+    80: 'Light Showers',
+    81: 'Showers',
+    82: 'Heavy Showers',
+    85: 'Light Snow Showers',
+    86: 'Snow Showers',
+    95: 'Thunderstorm',
+    96: 'Thunderstorm with Hail',
+    99: 'Thunderstorm with Heavy Hail'
+}
+
+# Language-specific terms for Tomorrow.io weather conditions
 Ltm_code_map = {
     0: 'Unknown',
     1000: 'Clear',
@@ -177,21 +225,20 @@ Ltm_code_map = {
 # screen 1, top radar
 radar1 = {
     'center': radar_location,  # the center of your radar block
-    'zoom': 7,  # this is a maps zoom factor, bigger number = smaller area, max is 7
-    'basemap': map_base,  # Mapbox style for standard map or custom map with land and water only
-    'overlay': map_overlay,  # Mapbox style for labels, roads, and borders only
-    'color': 2,  # rainviewer radar color scheme:
-    # https://www.rainviewer.com/api/color-schemes.html
-    'smooth': 1,  # rainviewer radar smoothing
-    'snow': 1,  # rainviewer radar show snow as different color
-    'markers': (  # google maps markers can be overlaid
+    'zoom': 7,  # this is a map zoom factor, bigger number = smaller area
+    'basemap': globals().get('map_base', ''),  # Base map type or style
+    'overlay': globals().get('map_overlay', ''),  # Mapbox custom style for labels, roads, and borders only
+    'color': 7,  # radar color scheme: https://librewxr.net/docs/doc-viewer#color-schemes
+    'smooth': 1,  # radar smoothing
+    'snow': 1,  # display snow as different color
+    'markers': (  # map markers can be overlaid
         {
             'visible': 1,  # 0 = hide marker, 1 = show marker
             'location': radar_location,
             'color': 'red',
             'size': 'small',
             'image': 'teardrop-dot',  # optional image from the markers folder
-        },  # dangling comma is on purpose.
+        },  # dangling comma is on purpose to add more markers
     )
 }
 
@@ -199,9 +246,9 @@ radar1 = {
 radar2 = {
     'center': radar_location,
     'zoom': 5,
-    'basemap': map_base,
-    'overlay': map_overlay,
-    'color': 2,
+    'basemap': globals().get('map_base', ''),
+    'overlay': globals().get('map_overlay', ''),
+    'color': 7,
     'smooth': 1,
     'snow': 1,
     'markers': (
@@ -219,9 +266,9 @@ radar2 = {
 radar3 = {
     'center': radar_location,
     'zoom': 7,
-    'basemap': map_base,
-    'overlay': map_overlay,
-    'color': 2,
+    'basemap': globals().get('map_base', ''),
+    'overlay': globals().get('map_overlay', ''),
+    'color': 7,
     'smooth': 1,
     'snow': 1,
     'markers': (
@@ -239,9 +286,9 @@ radar3 = {
 radar4 = {
     'center': radar_location,
     'zoom': 4,
-    'basemap': map_base,
-    'overlay': map_overlay,
-    'color': 2,
+    'basemap': globals().get('map_base', ''),
+    'overlay': globals().get('map_overlay', ''),
+    'color': 7,
     'smooth': 1,
     'snow': 1,
     'markers': (
