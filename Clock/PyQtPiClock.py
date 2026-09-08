@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-                 # NOQA
+# -*- coding: utf-8 -*-
 
 import datetime
 import json
@@ -7,6 +7,7 @@ import math
 import os
 import platform
 import random
+import re
 import signal
 import sys
 import time
@@ -26,8 +27,10 @@ from PyQt5.QtNetwork import QNetworkRequest
 from tzfpy import get_tz
 
 sys.dont_write_bytecode = True
-from GoogleMercatorProjection import get_corners, get_point, get_tile_xy, LatLng  # NOQA
-import ApiKeys  # NOQA
+# These local imports intentionally come after sys.dont_write_bytecode is set.
+# noqa: E402 tells lint tools to allow these imports below executable code.
+from GoogleMercatorProjection import get_corners, get_point, get_tile_xy, LatLng  # noqa: E402
+import ApiKeys  # noqa: E402
 
 
 # --- Daily log rotation (at local midnight), keeping PyQtPiClock.1.log ... .7.log ---
@@ -107,6 +110,7 @@ class _DailyRotatingLineLogger:
     def flush(self):
         self._maybe_rollover()
         if self._buf:
+            out = ""
             # flush partial line without forcing a newline
             try:
                 out = self._timestamp_prefix() + self._buf
@@ -227,7 +231,7 @@ class SunTimes:
         longitude = self.lng  # in decimal degrees, east is positive
         latitude = self.lat  # in decimal degrees, north is positive
 
-        time = self.time  # percentage past midnight, i.e. noon  is 0.5
+        time = self.time  # percentage past midnight, i.e., noon is 0.5
         day = self.day  # daynumber 1=1/1/1900
 
         j_day = day + 2415018.5 + time - timezone / 24  # Julian day
@@ -294,13 +298,9 @@ def moon_phase(dt=None):
 
 
 def tick():
-    global hourpixmap, minpixmap, secpixmap
-    global hourpixmap2, minpixmap2, secpixmap2
     global lastmin, lastday, lasttimestr
-    global clockrect
-    global datex, datex2, datey2, pdy
-    global sun, daytime, sunrise, sunset
-    global bottom
+    global pdy
+    global daytime, sunrise, sunset
 
     now = datetime.datetime.now(tz=tzlocal.get_localzone())
     if Config.digital:
@@ -410,7 +410,6 @@ def tick():
 
 
 def tempfinished():
-    global tempreply, temp
     if tempreply.error() != QNetworkReply.NoError:
         return
     tempstr = str(tempreply.readAll(), 'utf-8')
@@ -439,6 +438,12 @@ def tempfinished():
                 for tk in tempdata['temps']:
                     s += ' ' + tk + ': ' + tempdata['temps'][tk] + u'°F'
     temp.setText(s)
+
+
+def safeurl(url):
+    """Remove API keys from URLs for printing to screen or logging."""
+    return re.sub(r'((?:apikey|appid|key|access_token)=)[^&]*',
+                  r'\1<key>', url)
 
 
 def tempf2tempc(f):
@@ -541,10 +546,7 @@ owm_code_icons = {
 
 
 def wxfinished_owm_onecall():
-    global wxreply, hasMetar
-    global wxicon, temper, wxdesc, press, humidity
-    global wind, feelslike, wdate, forecast
-    global wxicon2, temper2, wxdesc2, attribution
+    """Get current weather conditions and forecast in one call from OpenWeatherMap.org"""
     global owmonecall
 
     attribution.setText('OpenWeatherMap.org')
@@ -574,7 +576,7 @@ def wxfinished_owm_onecall():
         dt = datetime.datetime.fromtimestamp(int(f['dt'])).astimezone(tzlocal.get_localzone())
         icon = f['weather'][0]['icon']
         icon = owm_code_icons[icon]
-        wxiconpixmap = QtGui.QPixmap(Config.icons + '/' + icon + '.png')
+        wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, icon + '.png'))
         wxicon.setPixmap(wxiconpixmap.scaled(
             wxicon.width(), wxicon.height(), Qt.IgnoreAspectRatio,
             Qt.SmoothTransformation))
@@ -622,7 +624,7 @@ def wxfinished_owm_onecall():
         wicon = f['weather'][0]['icon']
         wicon = owm_code_icons[wicon]
         icon = fl.findChild(QtWidgets.QLabel, 'icon')
-        wxiconpixmap = QtGui.QPixmap(Config.icons + '/' + wicon + '.png')
+        wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, wicon + '.png'))
         icon.setPixmap(wxiconpixmap.scaled(
             icon.width(),
             icon.height(),
@@ -630,7 +632,7 @@ def wxfinished_owm_onecall():
             Qt.SmoothTransformation))
         wx = fl.findChild(QtWidgets.QLabel, 'wx')
         day = fl.findChild(QtWidgets.QLabel, 'day')
-        day.setText('{0:%A %I:%M%p}'.format(dt))
+        day.setText('{0:%a %I:%M%p}'.format(dt))
         s = ''
         pop = 0
         ptype = ''
@@ -678,7 +680,7 @@ def wxfinished_owm_onecall():
         wicon = owm_code_icons[wicon]
         fl = forecast[i]
         icon = fl.findChild(QtWidgets.QLabel, 'icon')
-        wxiconpixmap = QtGui.QPixmap(Config.icons + '/' + wicon + '.png')
+        wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, wicon + '.png'))
         icon.setPixmap(wxiconpixmap.scaled(
             icon.width(),
             icon.height(),
@@ -686,7 +688,7 @@ def wxfinished_owm_onecall():
             Qt.SmoothTransformation))
         wx = fl.findChild(QtWidgets.QLabel, 'wx')
         day = fl.findChild(QtWidgets.QLabel, 'day')
-        day.setText('{0:%A %m/%d}'.format(dt))
+        day.setText('{0:%a %m/%d}'.format(dt))
         s = ''
         pop = 0
         ptype = ''
@@ -726,11 +728,7 @@ def wxfinished_owm_onecall():
 
 
 def wxfinished_owm_current():
-    global wxreplyc
-    global wxicon, temper, wxdesc, press, humidity
-    global wind, feelslike, wdate
-    global wxicon2, temper2, wxdesc2
-
+    """Get current weather conditions from OpenWeatherMap.org"""
     wxstr = str(wxreplyc.readAll(), 'utf-8')
 
     try:
@@ -749,7 +747,7 @@ def wxfinished_owm_current():
     dt = datetime.datetime.fromtimestamp(int(f['dt'])).astimezone(tzlocal.get_localzone())
     icon = f['weather'][0]['icon']
     icon = owm_code_icons[icon]
-    wxiconpixmap = QtGui.QPixmap(Config.icons + "/" + icon + ".png")
+    wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, icon + '.png'))
     wxicon.setPixmap(wxiconpixmap.scaled(
         wxicon.width(), wxicon.height(), Qt.IgnoreAspectRatio,
         Qt.SmoothTransformation))
@@ -792,10 +790,7 @@ def wxfinished_owm_current():
 
 
 def wxfinished_owm_forecast():
-    global wxreplyf, forecast
-    global attribution
-    global tzlatlng
-
+    """Get the weather forecast from OpenWeatherMap.org"""
     attribution.setText('OpenWeatherMap.org')
     attribution2.setText('OpenWeatherMap.org')
 
@@ -821,7 +816,7 @@ def wxfinished_owm_forecast():
         wicon = f['weather'][0]['icon']
         wicon = owm_code_icons[wicon]
         icon = fl.findChild(QtWidgets.QLabel, "icon")
-        wxiconpixmap = QtGui.QPixmap(Config.icons + "/" + wicon + ".png")
+        wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, wicon + '.png'))
         icon.setPixmap(wxiconpixmap.scaled(
             icon.width(),
             icon.height(),
@@ -829,7 +824,7 @@ def wxfinished_owm_forecast():
             Qt.SmoothTransformation))
         wx = fl.findChild(QtWidgets.QLabel, "wx")
         day = fl.findChild(QtWidgets.QLabel, "day")
-        day.setText("{0:%A %I:%M%p}".format(dt))
+        day.setText("{0:%a %I:%M%p}".format(dt))
         f2 = f['main']
         s = ''
         pop = 0
@@ -894,7 +889,7 @@ def wxfinished_owm_forecast():
             if dx6am <= dt <= dx6amnext:
                 if setday:
                     setday = False
-                    day.setText("{0:%A %m/%d}".format(dt))
+                    day.setText("{0:%a %m/%d}".format(dt))
                 pop = 0.0
                 if 'pop' in f:
                     pop = float(f['pop']) * 100.0
@@ -942,7 +937,7 @@ def wxfinished_owm_forecast():
             wx.setText(wdesc + "\n" + s)
             wicon = owm_code_icons[wicon]
             wicon = wicon.replace('-night', '-day')
-            wxiconpixmap = QtGui.QPixmap(Config.icons + "/" + wicon + ".png")
+            wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, wicon + '.png'))
             icon.setPixmap(wxiconpixmap.scaled(
                 icon.width(),
                 icon.height(),
@@ -951,6 +946,57 @@ def wxfinished_owm_forecast():
 
         dx6am += datetime.timedelta(1)
         dx6amnext += datetime.timedelta(1)
+
+
+def getwx_owm():
+    """Get weather from OpenWeatherMap.org"""
+    global wxreply, wxreplyc, wxreplyf
+
+    if not hasattr(ApiKeys, 'owmapi'):
+        return
+
+    owmapi = ApiKeys.owmapi
+
+    # try OWM One Call once, if it fails, then we go to two calls (current weather and forecast)
+    if owmonecall:
+        wxurl = 'https://api.openweathermap.org/data/3.0/onecall?appid=' + \
+                owmapi
+    else:
+        wxurl = 'https://api.openweathermap.org/data/2.5/forecast?appid=' + \
+                owmapi
+
+    wxurl += "&lat=" + str(Config.location.lat) + \
+             '&lon=' + str(Config.location.lng)
+    wxurl += '&units=imperial&lang=' + Config.Language.lower()
+    wxurl += '&r=' + str(random.random())
+
+    if owmonecall:
+        print('INFO: getting OpenWeather One Call: ' + safeurl(wxurl))
+    else:
+        print('INFO: getting OpenWeather forecast: ' + safeurl(wxurl))
+
+    r = QUrl(wxurl)
+    r = QNetworkRequest(r)
+
+    if owmonecall:
+        wxreply = manager.get(r)
+        wxreply.finished.connect(wxfinished_owm_onecall)
+    else:
+        wxreplyf = manager.get(r)
+        wxreplyf.finished.connect(wxfinished_owm_forecast)
+
+    if not hasMetar and not owmonecall:
+        wxurl = 'https://api.openweathermap.org/data/2.5/weather?appid=' + \
+                owmapi
+        wxurl += "&lat=" + str(Config.location.lat) + \
+                 '&lon=' + str(Config.location.lng)
+        wxurl += '&units=imperial&lang=' + Config.Language.lower()
+        wxurl += '&r=' + str(random.random())
+        print('INFO: getting OpenWeather current conditions: ' + safeurl(wxurl))
+        r = QUrl(wxurl)
+        r = QNetworkRequest(r)
+        wxreplyc = manager.get(r)
+        wxreplyc.finished.connect(wxfinished_owm_current)
 
 
 def getmost(a):
@@ -1016,12 +1062,7 @@ tm_code_icons = {
 
 
 def wxfinished_tm_current():
-    global wxreply
-    global wxicon, temper, wxdesc, press, humidity
-    global wind, feelslike, wdate
-    global wxicon2, temper2, wxdesc2
-    global daytime
-
+    """Get current weather conditions from Tomorrow.io"""
     wxstr = str(wxreply.readAll(), 'utf-8')
 
     try:
@@ -1043,7 +1084,7 @@ def wxfinished_tm_current():
     icon = tm_code_icons[icon]
     if not daytime:
         icon = icon.replace('-day', '-night')
-    wxiconpixmap = QtGui.QPixmap(Config.icons + '/' + icon + '.png')
+    wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, icon + '.png'))
     wxicon.setPixmap(wxiconpixmap.scaled(
         wxicon.width(), wxicon.height(), Qt.IgnoreAspectRatio,
         Qt.SmoothTransformation))
@@ -1055,28 +1096,36 @@ def wxfinished_tm_current():
     wxdesc.setText(tm_code_map[f['values']['weatherCode']])
     wxdesc2.setText(tm_code_map[f['values']['weatherCode']])
 
-    if Config.wind_degrees:
-        wd = str(f['values']['windDirection']) + u'°'
-    else:
-        wd = bearing(f['values']['windDirection'])
+    wd = ''
+    if 'windDirection' in f['values']:
+        if Config.wind_degrees:
+            wd = str(f['values']['windDirection']) + u'° '
+        else:
+            wd = bearing(f['values']['windDirection']) + ' '
+
+    gust = ''
+    if 'windGust' in f['values']:
+        if Config.metric:
+            gust = (Config.Lgusting +
+                    '%.1f' % (mph2kph(f['values']['windGust'])) + 'km/h')
+        else:
+            gust = (Config.Lgusting +
+                    '%.1f' % (f['values']['windGust']) + 'mph')
 
     if Config.metric:
         temper.setText('%.1f' % (tempf2tempc(f['values']['temperature'])) + u'°C')
         temper2.setText('%.1f' % (tempf2tempc(f['values']['temperature'])) + u'°C')
-        wind.setText(Config.LWind + wd + ' ' +
+        wind.setText(Config.LWind + wd +
                      '%.1f' % (mph2kph(f['values']['windSpeed'])) + 'km/h' +
-                     Config.Lgusting +
-                     '%.1f' % (mph2kph(f['values']['windGust'])) + 'km/h')
+                     gust)
         feelslike.setText(Config.LFeelslike +
                           '%.1f' % (tempf2tempc(f['values']['temperatureApparent'])) + u'°C')
     else:
         temper.setText('%.1f' % (f['values']['temperature']) + u'°F')
         temper2.setText('%.1f' % (f['values']['temperature']) + u'°F')
-        wind.setText(Config.LWind +
-                     wd + ' ' +
+        wind.setText(Config.LWind + wd +
                      '%.1f' % (f['values']['windSpeed']) + 'mph' +
-                     Config.Lgusting +
-                     '%.1f' % (f['values']['windGust']) + 'mph')
+                     gust)
         feelslike.setText(Config.LFeelslike +
                           '%.1f' % (f['values']['temperatureApparent']) + u'°F')
 
@@ -1090,9 +1139,7 @@ def wxfinished_tm_current():
 
 
 def wxfinished_tm_hourly():
-    global wxreply2, forecast
-    global daytime, attribution
-
+    """Get the hourly weather forecast from Tomorrow.io"""
     attribution.setText('Tomorrow.io')
     attribution2.setText('Tomorrow.io')
 
@@ -1131,7 +1178,7 @@ def wxfinished_tm_hourly():
         if not fdaytime:
             wicon = wicon.replace('-day', '-night')
         icon = fl.findChild(QtWidgets.QLabel, 'icon')
-        wxiconpixmap = QtGui.QPixmap(Config.icons + '/' + wicon + '.png')
+        wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, wicon + '.png'))
         icon.setPixmap(wxiconpixmap.scaled(
             icon.width(),
             icon.height(),
@@ -1139,7 +1186,7 @@ def wxfinished_tm_hourly():
             Qt.SmoothTransformation))
         wx = fl.findChild(QtWidgets.QLabel, 'wx')
         day = fl.findChild(QtWidgets.QLabel, 'day')
-        day.setText('{0:%A %I:%M%p}'.format(dt))
+        day.setText('{0:%a %I:%M%p}'.format(dt))
         s = ''
         pop = float(f['values']['precipitationProbability'])
         ptype = f['values']['precipitationType']
@@ -1171,8 +1218,7 @@ def wxfinished_tm_hourly():
 
 
 def wxfinished_tm_daily():
-    global wxreply3, forecast
-
+    """Get the daily weather forecast from Tomorrow.io"""
     wxstr3 = str(wxreply3.readAll(), 'utf-8')
 
     try:
@@ -1199,7 +1245,7 @@ def wxfinished_tm_daily():
             wicon = tm_code_icons[wicon]
             fl = forecast[i]
             icon = fl.findChild(QtWidgets.QLabel, 'icon')
-            wxiconpixmap = QtGui.QPixmap(Config.icons + '/' + wicon + '.png')
+            wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, wicon + '.png'))
             icon.setPixmap(wxiconpixmap.scaled(
                 icon.width(),
                 icon.height(),
@@ -1207,7 +1253,7 @@ def wxfinished_tm_daily():
                 Qt.SmoothTransformation))
             wx = fl.findChild(QtWidgets.QLabel, 'wx')
             day = fl.findChild(QtWidgets.QLabel, 'day')
-            day.setText('{0:%A %m/%d}'.format(dateutil.parser.parse(f['startTime'])
+            day.setText('{0:%a %m/%d}'.format(dateutil.parser.parse(f['startTime'])
                                               .astimezone(tzlocal.get_localzone())))
             s = ''
             pop = float(f['values']['precipitationProbability'])
@@ -1276,6 +1322,53 @@ def wxfinished_tm_daily():
             pass
 
 
+def getwx_tm():
+    """Get weather from Tomorrow.io"""
+    global wxreply, wxreply2, wxreply3
+
+    if not hasattr(ApiKeys, 'tmapi'):
+        return
+
+    tmapi = ApiKeys.tmapi
+
+    if not hasMetar:
+        # current conditions
+        wxurl = 'https://api.tomorrow.io/v4/timelines?timesteps=current&apikey=' + tmapi
+        wxurl += '&location=' + str(Config.location.lat) + ',' + str(Config.location.lng)
+        wxurl += '&units=imperial'
+        wxurl += '&fields=temperature,weatherCode,temperatureApparent,humidity,'
+        wxurl += 'windSpeed,windDirection,windGust,pressureSeaLevel,precipitationType'
+        print('INFO: getting Tomorrow.io current conditions: ' + safeurl(wxurl))
+        r = QUrl(wxurl)
+        r = QNetworkRequest(r)
+        wxreply = manager.get(r)
+        wxreply.finished.connect(wxfinished_tm_current)
+
+    # hourly forecast
+    wxurl2 = 'https://api.tomorrow.io/v4/timelines?timesteps=1h&apikey=' + tmapi
+    wxurl2 += '&location=' + str(Config.location.lat) + ',' + str(Config.location.lng)
+    wxurl2 += '&units=imperial'
+    wxurl2 += '&fields=temperature,precipitationIntensity,precipitationType,'
+    wxurl2 += 'precipitationProbability,weatherCode'
+    print('INFO: getting Tomorrow.io hourly forecast: ' + safeurl(wxurl2))
+    r2 = QUrl(wxurl2)
+    r2 = QNetworkRequest(r2)
+    wxreply2 = manager.get(r2)
+    wxreply2.finished.connect(wxfinished_tm_hourly)
+
+    # daily forecast
+    wxurl3 = 'https://api.tomorrow.io/v4/timelines?timesteps=1d&apikey=' + tmapi
+    wxurl3 += '&location=' + str(Config.location.lat) + ',' + str(Config.location.lng)
+    wxurl3 += '&units=imperial'
+    wxurl3 += '&fields=temperature,precipitationIntensity,precipitationType,'
+    wxurl3 += 'precipitationProbability,weatherCode,temperatureMax,temperatureMin'
+    print('INFO: getting Tomorrow.io daily forecast: ' + safeurl(wxurl3))
+    r3 = QUrl(wxurl3)
+    r3 = QNetworkRequest(r3)
+    wxreply3 = manager.get(r3)
+    wxreply3.finished.connect(wxfinished_tm_daily)
+
+
 metar_cond = [
     ('CLR', '', '', 'Clear', 'clear-day', 0),
     ('NSC', '', '', 'Clear', 'clear-day', 0),
@@ -1317,7 +1410,7 @@ metar_cond = [
     ('SN', 'BL', '', 'Blowing Snow', 'snow', 12),
     ('SN', '', '+', 'Heavy Snow', 'snow', 12),
     ('SN', '', '-', 'Light Snow', 'snow', 12),
-    ('SN', '', '', 'Rain', 'snow', 12),
+    ('SN', '', '', 'Snow', 'snow', 12),
 
     ('SG', 'BL', '', 'Blowing Snow', 'snow', 12),
     ('SG', '', '', 'Snow', 'snow', 12),
@@ -1327,8 +1420,8 @@ metar_cond = [
     ('IC', '', '', 'Ice Crystals', 'snow', 13),
     ('PL', '', '', 'Ice Pellets', 'snow', 13),
 
-    ('GR', '', '+', 'Heavy Hail', 'thuderstorm', 14),
-    ('GR', '', '', 'Hail', 'thuderstorm', 14),
+    ('GR', '', '+', 'Heavy Hail', 'thunderstorm', 14),
+    ('GR', '', '', 'Hail', 'thunderstorm', 14),
 ]
 
 
@@ -1360,12 +1453,7 @@ def feels_like(f):
 
 
 def wxfinished_metar():
-    global metarreply
-    global wxicon, temper, wxdesc, press, humidity
-    global wind, feelslike, wdate
-    global wxicon2, temper2, wxdesc2
-    global daytime
-
+    """Get current weather conditions from NOAA METAR"""
     wxstr = str(metarreply.readAll(), 'utf-8')
 
     if metarreply.error() != QNetworkReply.NoError:
@@ -1392,35 +1480,42 @@ def wxfinished_metar():
                         pri = c[5]
                         weather = c[3]
                         icon = c[4]
-    if f.weather:
-        for w in f.weather:
-            for c in metar_cond:
-                if w[2] == c[0]:
-                    if c[1] > '':
-                        if w[1] == c[1]:
-                            if c[2] > '':
-                                if w[0][0:1] == c[2]:
-                                    if c[5] > pri:
-                                        pri = c[5]
-                                        weather = c[3]
-                                        icon = c[4]
-                    else:
+    # A report lists present weather in decreasing significance, so the first
+    # group that matches is the one to show.  wpri ranks the table rows that
+    # match this one group, which is what picks Light Rain over the plainer
+    # Rain; it does not carry across groups, or a later and less significant
+    # group could outrank an earlier one.
+    for w in f.weather:
+        wpri = -1
+        for c in metar_cond:
+            if w[2] == c[0]:
+                if c[1] > '':
+                    if w[1] == c[1]:
                         if c[2] > '':
                             if w[0][0:1] == c[2]:
-                                if c[5] > pri:
-                                    pri = c[5]
+                                if c[5] > wpri:
+                                    wpri = c[5]
                                     weather = c[3]
                                     icon = c[4]
-                        else:
-                            if c[5] > pri:
-                                pri = c[5]
+                else:
+                    if c[2] > '':
+                        if w[0][0:1] == c[2]:
+                            if c[5] > wpri:
+                                wpri = c[5]
                                 weather = c[3]
                                 icon = c[4]
+                    else:
+                        if c[5] > wpri:
+                            wpri = c[5]
+                            weather = c[3]
+                            icon = c[4]
+        if wpri > -1:
+            break
 
     if not daytime:
         icon = icon.replace('-day', '-night')
 
-    wxiconpixmap = QtGui.QPixmap(Config.icons + '/' + icon + '.png')
+    wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, icon + '.png'))
     wxicon.setPixmap(wxiconpixmap.scaled(
         wxicon.width(), wxicon.height(), Qt.IgnoreAspectRatio,
         Qt.SmoothTransformation))
@@ -1488,125 +1583,8 @@ def wxfinished_metar():
     wdate.setText('{0:%H:%M %Z} {1}'.format(dt, Config.METAR))
 
 
-def getallwx():
-    global hasMetar
-    if hasMetar:
-        try:
-            getwx_metar()
-        except AttributeError:
-            pass
-
-    try:
-        ApiKeys.tmapi
-        global tm_code_map
-        try:
-            tm_code_map = Config.Ltm_code_map
-        except AttributeError:
-            pass
-        getwx_tm()
-        return
-    except AttributeError:
-        pass
-
-    try:
-        ApiKeys.owmapi
-        getwx_owm()
-        return
-    except AttributeError:
-        pass
-
-
-def getwx_owm():
-    global wxreply, wxreplyc, wxreplyf
-    global hasMetar
-    global owmonecall
-    # try OWM One Call once, if it fails, then we go to two calls (current weather and forecast)
-    if owmonecall:
-        wxurl = 'https://api.openweathermap.org/data/3.0/onecall?appid=' + \
-                ApiKeys.owmapi
-    else:
-        wxurl = 'https://api.openweathermap.org/data/2.5/forecast?appid=' + \
-                ApiKeys.owmapi
-
-    wxurl += "&lat=" + str(Config.location.lat) + \
-             '&lon=' + str(Config.location.lng)
-    wxurl += '&units=imperial&lang=' + Config.Language.lower()
-    wxurl += '&r=' + str(random.random())
-
-    if owmonecall:
-        print('INFO: getting OpenWeather One Call: ' + wxurl)
-    else:
-        print('INFO: getting OpenWeather forecast: ' + wxurl)
-
-    r = QUrl(wxurl)
-    r = QNetworkRequest(r)
-
-    if owmonecall:
-        wxreply = manager.get(r)
-        wxreply.finished.connect(wxfinished_owm_onecall)
-    else:
-        wxreplyf = manager.get(r)
-        wxreplyf.finished.connect(wxfinished_owm_forecast)
-
-    if not hasMetar and not owmonecall:
-        wxurl = 'https://api.openweathermap.org/data/2.5/weather?appid=' + \
-                ApiKeys.owmapi
-        wxurl += "&lat=" + str(Config.location.lat) + \
-                 '&lon=' + str(Config.location.lng)
-        wxurl += '&units=imperial&lang=' + Config.Language.lower()
-        wxurl += '&r=' + str(random.random())
-        print('INFO: getting OpenWeather current conditions: ' + wxurl)
-        r = QUrl(wxurl)
-        r = QNetworkRequest(r)
-        wxreplyc = manager.get(r)
-        wxreplyc.finished.connect(wxfinished_owm_current)
-
-
-def getwx_tm():
-    global wxreply
-    global wxreply2
-    global wxreply3
-    global hasMetar
-
-    if not hasMetar:
-        # current conditions
-        wxurl = 'https://api.tomorrow.io/v4/timelines?timesteps=current&apikey=' + ApiKeys.tmapi
-        wxurl += '&location=' + str(Config.location.lat) + ',' + str(Config.location.lng)
-        wxurl += '&units=imperial'
-        wxurl += '&fields=temperature,weatherCode,temperatureApparent,humidity,'
-        wxurl += 'windSpeed,windDirection,windGust,pressureSeaLevel,precipitationType'
-        print('INFO: getting Tomorrow.io current conditions: ' + wxurl)
-        r = QUrl(wxurl)
-        r = QNetworkRequest(r)
-        wxreply = manager.get(r)
-        wxreply.finished.connect(wxfinished_tm_current)
-
-    # hourly forecast
-    wxurl2 = 'https://api.tomorrow.io/v4/timelines?timesteps=1h&apikey=' + ApiKeys.tmapi
-    wxurl2 += '&location=' + str(Config.location.lat) + ',' + str(Config.location.lng)
-    wxurl2 += '&units=imperial'
-    wxurl2 += '&fields=temperature,precipitationIntensity,precipitationType,'
-    wxurl2 += 'precipitationProbability,weatherCode'
-    print('INFO: getting Tomorrow.io hourly forecast: ' + wxurl2)
-    r2 = QUrl(wxurl2)
-    r2 = QNetworkRequest(r2)
-    wxreply2 = manager.get(r2)
-    wxreply2.finished.connect(wxfinished_tm_hourly)
-
-    # daily forecast
-    wxurl3 = 'https://api.tomorrow.io/v4/timelines?timesteps=1d&apikey=' + ApiKeys.tmapi
-    wxurl3 += '&location=' + str(Config.location.lat) + ',' + str(Config.location.lng)
-    wxurl3 += '&units=imperial'
-    wxurl3 += '&fields=temperature,precipitationIntensity,precipitationType,'
-    wxurl3 += 'precipitationProbability,weatherCode,temperatureMax,temperatureMin'
-    print('INFO: getting Tomorrow.io daily forecast: ' + wxurl3)
-    r3 = QUrl(wxurl3)
-    r3 = QNetworkRequest(r3)
-    wxreply3 = manager.get(r3)
-    wxreply3.finished.connect(wxfinished_tm_daily)
-
-
 def getwx_metar():
+    """Get current weather conditions from NOAA METAR"""
     global metarreply
     metarurl = 'https://tgftp.nws.noaa.gov/data/observations/metar/stations/' + Config.METAR + '.TXT'
     print('INFO: getting METAR current conditions: ' + metarurl)
@@ -1616,12 +1594,305 @@ def getwx_metar():
     metarreply.finished.connect(wxfinished_metar)
 
 
+om_code_icons = {
+    0: 'clear-day',
+    1: 'clear-day',
+    2: 'partly-cloudy-day',
+    3: 'cloudy',
+    45: 'fog',
+    48: 'fog',
+    51: 'rain',
+    53: 'rain',
+    55: 'rain',
+    56: 'sleet',
+    57: 'sleet',
+    61: 'rain',
+    63: 'rain',
+    65: 'rain',
+    66: 'sleet',
+    67: 'sleet',
+    71: 'snow',
+    73: 'snow',
+    75: 'snow',
+    77: 'snow',
+    80: 'rain',
+    81: 'rain',
+    82: 'rain',
+    85: 'snow',
+    86: 'snow',
+    95: 'thunderstorm',
+    96: 'thunderstorm',
+    99: 'thunderstorm'
+}
+
+om_code_map = {
+    0: 'Clear',
+    1: 'Mainly Clear',
+    2: 'Partly Cloudy',
+    3: 'Overcast',
+    45: 'Fog',
+    48: 'Freezing Fog',
+    51: 'Light Drizzle',
+    53: 'Drizzle',
+    55: 'Heavy Drizzle',
+    56: 'Light Freezing Drizzle',
+    57: 'Freezing Drizzle',
+    61: 'Light Rain',
+    63: 'Rain',
+    65: 'Heavy Rain',
+    66: 'Light Freezing Rain',
+    67: 'Freezing Rain',
+    71: 'Light Snow',
+    73: 'Snow',
+    75: 'Heavy Snow',
+    77: 'Snow Grains',
+    80: 'Light Showers',
+    81: 'Showers',
+    82: 'Heavy Showers',
+    85: 'Light Snow Showers',
+    86: 'Snow Showers',
+    95: 'Thunderstorm',
+    96: 'Thunderstorm with Hail',
+    99: 'Thunderstorm with Heavy Hail'
+}
+
+om_snow_codes = (71, 73, 75, 77, 85, 86)
+
+
+def om_icon(code, isday):
+    icon = om_code_icons.get(code, 'cloudy')
+    if not isday:
+        icon = icon.replace('-day', '-night')
+    return icon
+
+
+def wxfinished_om():
+    """Get current weather conditions and forecast from Open-Meteo.com"""
+    attribution.setText('Open-Meteo.com')
+    attribution2.setText('Open-Meteo.com')
+
+    wxstr = str(wxreply.readAll(), 'utf-8')
+
+    try:
+        wxdata = json.loads(wxstr)
+    except ValueError:  # includes json.decoder.JSONDecodeError
+        print('WARNING:', traceback.format_exc())
+        print('WARNING: Response from api.open-meteo.com: ' + wxstr)
+        print('WARNING: Moving on...')
+        return  # ignore and try again on the next refresh
+
+    if 'error' in wxdata:
+        print('ERROR: Response from api.open-meteo.com: ' + str(wxdata.get('reason')))
+        return
+
+    if not hasMetar:
+        c = wxdata['current']
+        dt = dateutil.parser.parse(c['time']).astimezone(tzlocal.get_localzone())
+        icon = om_icon(c['weather_code'], c['is_day'])
+        wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons, icon + '.png'))
+        wxicon.setPixmap(wxiconpixmap.scaled(
+            wxicon.width(), wxicon.height(), Qt.IgnoreAspectRatio,
+            Qt.SmoothTransformation))
+        wxicon2.setPixmap(wxiconpixmap.scaled(
+            wxicon.width(), wxicon.height(), Qt.IgnoreAspectRatio,
+            Qt.SmoothTransformation))
+        wxdesc.setText(om_code_map.get(c['weather_code'], ''))
+        wxdesc2.setText(om_code_map.get(c['weather_code'], ''))
+
+        wd = ''
+        if c.get('wind_direction_10m') is not None:
+            if Config.wind_degrees:
+                wd = str(c['wind_direction_10m']) + u'° '
+            else:
+                wd = bearing(c['wind_direction_10m']) + ' '
+
+        gust = ''
+        if c.get('wind_gusts_10m') is not None:
+            if Config.metric:
+                gust = (Config.Lgusting +
+                        '%.1f' % (mph2kph(c['wind_gusts_10m'])) + 'km/h')
+            else:
+                gust = (Config.Lgusting +
+                        '%.1f' % (c['wind_gusts_10m']) + 'mph')
+
+        if Config.metric:
+            temper.setText('%.1f' % (tempf2tempc(c['temperature_2m'])) + u'°C')
+            temper2.setText('%.1f' % (tempf2tempc(c['temperature_2m'])) + u'°C')
+            wind.setText(Config.LWind + wd +
+                         '%.1f' % (mph2kph(c['wind_speed_10m'])) + 'km/h' +
+                         gust)
+            feelslike.setText(Config.LFeelslike +
+                              '%.1f' % (tempf2tempc(c['apparent_temperature'])) + u'°C')
+        else:
+            temper.setText('%.1f' % (c['temperature_2m']) + u'°F')
+            temper2.setText('%.1f' % (c['temperature_2m']) + u'°F')
+            wind.setText(Config.LWind + wd +
+                         '%.1f' % (c['wind_speed_10m']) + 'mph' +
+                         gust)
+            feelslike.setText(Config.LFeelslike +
+                              '%.1f' % (c['apparent_temperature']) + u'°F')
+
+        if Config.pressure_mbar:
+            press.setText(Config.LPressure + '%.1f' % c['pressure_msl'] + 'mbar')
+        else:
+            press.setText(Config.LPressure + '%.2f' % mbar2inhg(c['pressure_msl']) + 'inHg')
+
+        humidity.setText(Config.LHumidity +
+                         '%.0f%%' % (c['relative_humidity_2m']))
+        wdate.setText('{0:%H:%M %Z}'.format(dt))
+
+    h = wxdata['hourly']
+    now = datetime.datetime.now()
+    base = 0
+    for i in range(0, len(h['time'])):
+        if dateutil.parser.parse(h['time'][i]) > now:
+            base = i
+            break
+
+    for i in range(0, 3):
+        j = base + i * 3 + 2
+        if j >= len(h['time']):
+            break
+        fl = forecast[i]
+        ht = dateutil.parser.parse(h['time'][j]).astimezone(tzlocal.get_localzone())
+        if ht.day == now.day:
+            fdaytime = daytime
+        else:
+            fsunrise = sun.sunrise(ht)
+            fsunset = sun.sunset(ht)
+            fdaytime = fsunrise <= ht <= fsunset
+        code = h['weather_code'][j]
+        icon = fl.findChild(QtWidgets.QLabel, 'icon')
+        wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons,
+                                                  om_icon(code, fdaytime) + '.png'))
+        icon.setPixmap(wxiconpixmap.scaled(
+            icon.width(), icon.height(), Qt.IgnoreAspectRatio,
+            Qt.SmoothTransformation))
+        wx = fl.findChild(QtWidgets.QLabel, 'wx')
+        day = fl.findChild(QtWidgets.QLabel, 'day')
+        day.setText('{0:%a %I:%M%p}'.format(ht))
+        s = ''
+        pop = h['precipitation_probability'][j]
+        paccum = h['precipitation'][j]
+        if pop > 0:
+            s += '%.0f' % pop + '% '
+        if paccum > 0.01:
+            if code in om_snow_codes:
+                s += Config.LSnow
+            else:
+                s += Config.LRain
+            if Config.metric:
+                s += '%.0f' % inches2mm(paccum) + 'mm/hr '
+            else:
+                s += '%.2f' % paccum + 'in/hr '
+        if Config.metric:
+            s += '%.0f' % tempf2tempc(h['temperature_2m'][j]) + u'°C'
+        else:
+            s += '%.0f' % h['temperature_2m'][j] + u'°F'
+        wx.setText(om_code_map.get(code, '') + '\n' + s)
+
+    d = wxdata['daily']
+    for i in range(3, 9):
+        j = i - 3
+        if j >= len(d['time']):
+            break
+        fl = forecast[i]
+        code = d['weather_code'][j]
+        icon = fl.findChild(QtWidgets.QLabel, 'icon')
+        wxiconpixmap = QtGui.QPixmap(os.path.join(Config.icons,
+                                                  om_icon(code, True) + '.png'))
+        icon.setPixmap(wxiconpixmap.scaled(
+            icon.width(), icon.height(), Qt.IgnoreAspectRatio,
+            Qt.SmoothTransformation))
+        wx = fl.findChild(QtWidgets.QLabel, 'wx')
+        day = fl.findChild(QtWidgets.QLabel, 'day')
+        day.setText('{0:%a %m/%d}'.format(dateutil.parser.parse(d['time'][j])))
+        s = ''
+        pop = d['precipitation_probability_max'][j]
+        paccum = d['precipitation_sum'][j]
+        if pop > 0:
+            s += '%.0f' % pop + '% '
+        if paccum > 0.01:
+            if code in om_snow_codes:
+                s += Config.LSnow
+            else:
+                s += Config.LRain
+            if Config.metric:
+                s += '%.0f' % inches2mm(paccum) + 'mm '
+            else:
+                s += '%.2f' % paccum + 'in '
+        if Config.metric:
+            s += ('%.0f' % tempf2tempc(d['temperature_2m_max'][j]) + '/' +
+                  '%.0f' % tempf2tempc(d['temperature_2m_min'][j])) + u'°C'
+        else:
+            s += ('%.0f' % d['temperature_2m_max'][j] + '/' +
+                  '%.0f' % d['temperature_2m_min'][j]) + u'°F'
+        wx.setText(om_code_map.get(code, '') + '\n' + s)
+
+
+def getwx_om():
+    """Get weather from Open-Meteo.com"""
+    global wxreply
+    wxurl = ('https://api.open-meteo.com/v1/forecast?latitude=' +
+             str(Config.location.lat) +
+             '&longitude=' + str(Config.location.lng))
+    wxurl += '&current=temperature_2m,relative_humidity_2m,'
+    wxurl += 'apparent_temperature,is_day,weather_code,pressure_msl,'
+    wxurl += 'wind_speed_10m,wind_direction_10m,wind_gusts_10m'
+    wxurl += '&hourly=temperature_2m,weather_code,'
+    wxurl += 'precipitation_probability,precipitation'
+    wxurl += '&daily=weather_code,temperature_2m_max,temperature_2m_min,'
+    wxurl += 'precipitation_sum,precipitation_probability_max'
+    wxurl += '&temperature_unit=fahrenheit&wind_speed_unit=mph'
+    wxurl += '&precipitation_unit=inch&timezone=auto&forecast_days=8'
+    wxurl += '&r=' + str(random.random())
+    print('INFO: getting Open-Meteo current conditions and forecast: ' + wxurl)
+    r = QUrl(wxurl)
+    r = QNetworkRequest(r)
+    wxreply = manager.get(r)
+    wxreply.finished.connect(wxfinished_om)
+
+
+def getwx():
+    """Get weather from a selected provider"""
+    global om_code_map, tm_code_map
+
+    # Get weather from NOAA METAR if METAR station code is set in Config file
+    if hasMetar:
+        try:
+            getwx_metar()
+        except AttributeError:
+            pass
+
+    # Get weather from Open-Meteo.com if useopenmeteo = 1 in Config file
+    if getattr(Config, 'useopenmeteo', False):
+        # Use language-specific terms for Open-Meteo.com weather conditions if set in Config file
+        # else use default terms
+        om_code_map = getattr(Config, 'Lom_code_map', om_code_map)
+        getwx_om()
+        return
+
+    # Get weather from Tomorrow.io if tmapi key is set in ApiKeys file
+    if hasattr(ApiKeys, 'tmapi'):
+        # Use language-specific terms for Tomorrow.io weather conditions if set in Config file
+        # else use default terms
+        tm_code_map = getattr(Config, 'Ltm_code_map', tm_code_map)
+        getwx_tm()
+        return
+
+    # Get weather from OpenWeatherMap.org if owmapi key is set in ApiKeys file
+    if hasattr(ApiKeys, 'owmapi'):
+        getwx_owm()
+        return
+
+    # Fallback: Get weather from Open-Meteo.com
+    om_code_map = getattr(Config, 'Lom_code_map', om_code_map)
+    getwx_om()
+
+
 def qtstart():
+    """Start the Qt application"""
     global ctimer, wxtimer, temptimer, metadatatimer
-    global objradar1
-    global objradar2
-    global objradar3
-    global objradar4
     global sun, daytime, sunrise, sunset
     global tzlatlng
 
@@ -1652,7 +1923,7 @@ def qtstart():
     else:
         daytime = False
 
-    getallwx()
+    getwx()
 
     gettemp()
 
@@ -1674,20 +1945,20 @@ def qtstart():
     ctimer.start(1000)
 
     wxtimer = QtCore.QTimer()
-    wxtimer.timeout.connect(getallwx)
+    wxtimer.timeout.connect(getwx)
     wxtimer.start(int(1000 * Config.weather_refresh * 60 + random.uniform(1000, 10000)))
 
     temptimer = QtCore.QTimer()
     temptimer.timeout.connect(gettemp)
     temptimer.start(int(1000 * 10 * 60 + random.uniform(1000, 10000)))
 
-    # Fetch RainViewer metadata once at regular intervals (every 10 minutes)
+    # Fetch weather radar metadata once at regular intervals (every 10 minutes)
     metadatatimer = QtCore.QTimer()
-    metadatatimer.timeout.connect(get_rainviewer_metadata)
+    metadatatimer.timeout.connect(get_wx_radar_metadata)
     metadatatimer.start(int(1000 * 600 + random.uniform(1000, 5000)))  # 10 minutes
 
     # Fetch metadata immediately on startup
-    get_rainviewer_metadata()
+    get_wx_radar_metadata(force=True)
 
     if Config.useslideshow:
         objimage1.start(Config.slide_time)
@@ -1697,7 +1968,7 @@ class SlideShow(QtWidgets.QLabel):
     def __init__(self, parent, rect, myname):
         self.myname = myname
         self.rect = rect
-        QtWidgets.QLabel.__init__(self, parent)
+        super().__init__(parent)
 
         self.pause = False
         self.count = 0
@@ -1777,83 +2048,225 @@ class SlideShow(QtWidgets.QLabel):
             print('ERROR:', traceback.format_exc())
 
 
-# Global RainViewer metadata cache (shared by all Radar instances)
+# Global weather radar metadata cache (shared by all Radar instances)
 radarMetadataCache = {
     'data': {},
+    'host': '',
+    'paths': {},
+    'provider': '',
     'lastupdated': 0,
-    'updateinterval': 600  # refresh every 10 minutes (same as tile intervals)
+    'lastattempt': 0,
+    'inprogress': False,
+    'updateinterval': 600,  # refresh every 10 minutes (same as tile intervals)
+    'retryinterval': 30  # wait at least 30 seconds after a failed attempt
 }
 radarMetadataReply = None
 
 
-def get_rainviewer_metadata():
-    """Fetch RainViewer metadata once globally, shared by all radar instances"""
+def get_wx_radar_metadata(force=False):
+    """Fetch weather radar metadata once globally, shared by all radar instances."""
     global manager, radarMetadataCache, radarMetadataReply
 
-    # Check if the cache is still fresh (updated within the last 10 minutes)
-    if time.time() - radarMetadataCache['lastupdated'] < radarMetadataCache['updateinterval']:
+    now = time.time()
+
+    # Do not start another request while one is already running.
+    if radarMetadataCache['inprogress']:
         return
 
-    metadataurl = 'https://api.rainviewer.com/public/weather-maps.json'
-    print('INFO: Fetching RainViewer metadata: ' + metadataurl)
+    # Check if the cache is still fresh.
+    if not force and now - radarMetadataCache['lastupdated'] < radarMetadataCache['updateinterval']:
+        return
+
+    # If the last attempt failed, avoid retrying every 200ms from every active radar.
+    if not force and now - radarMetadataCache['lastattempt'] < radarMetadataCache['retryinterval']:
+        return
+
+    if Config.userainviewer:
+        metadataurl = 'https://api.rainviewer.com/public/weather-maps.json'
+        radarMetadataCache['provider'] = 'RainViewer.com'
+    else:
+        metadataurl = 'https://api.librewxr.net/public/weather-maps.json'
+        radarMetadataCache['provider'] = 'LibreWXR.net'
+
+    radarMetadataCache['inprogress'] = True
+    radarMetadataCache['lastattempt'] = now
+
+    print('INFO: Fetching weather radar metadata: ' + metadataurl)
     metadatareq = QNetworkRequest(QUrl(metadataurl))
     radarMetadataReply = manager.get(metadatareq)
-    radarMetadataReply.finished.connect(rainviewer_metadata_finished)
+
+    reply = radarMetadataReply
+    reply.finished.connect(lambda reply=reply: wx_radar_metadata_finished(reply))
 
 
-def rainviewer_metadata_finished():
-    """Process the RainViewer metadata response"""
+def wx_radar_metadata_finished(reply):
+    """Process the weather radar metadata response."""
     global radarMetadataCache, radarMetadataReply
 
-    if radarMetadataReply.error() != QNetworkReply.NoError:
-        metadatastr = str(radarMetadataReply.readAll(), 'utf-8')
-        print('ERROR: Response from api.rainviewer.com: ' + metadatastr)
+    radarMetadataCache['inprogress'] = False
+
+    if reply.error() != QNetworkReply.NoError:
+        metadatastr = str(reply.readAll(), 'utf-8')
+        print('ERROR: Response from weather radar provider: ' + metadatastr)
+        reply.deleteLater()
+        if reply is radarMetadataReply:
+            radarMetadataReply = None
         return
 
-    metadatastr = str(radarMetadataReply.readAll(), 'utf-8')
+    metadatastr = str(reply.readAll(), 'utf-8')
+    reply.deleteLater()
+    if reply is radarMetadataReply:
+        radarMetadataReply = None
+
+    if not metadatastr.strip():
+        print('WARNING: Empty response from weather radar provider')
+        return
+
     try:
-        radarMetadataCache['data'] = json.loads(metadatastr)
-        radarMetadataCache['lastupdated'] = time.time()
+        metadata = json.loads(metadatastr)
     except ValueError:  # includes json.decoder.JSONDecodeError
         print('WARNING:', traceback.format_exc())
-        print('WARNING: Response from api.rainviewer.com: ' + metadatastr)
+        print('WARNING: Response from weather radar provider: ' + metadatastr)
         return
 
+    paths = {}
+    radar = metadata.get('radar', {})
+    for frame in radar.get('past', []) + radar.get('nowcast', []):
+        try:
+            paths[int(frame['time'])] = frame['path']
+        except (KeyError, TypeError, ValueError):
+            print('WARNING:', traceback.format_exc())
+            pass
+
+    host = metadata.get('host', '')
+    if not host:
+        print('WARNING: Weather radar metadata response did not include a host')
+        return
+
+    if not paths:
+        print('WARNING: Weather radar metadata response did not include any radar frames')
+        return
+
+    radarMetadataCache['data'] = metadata
+    radarMetadataCache['host'] = host
+    radarMetadataCache['paths'] = paths
+    radarMetadataCache['lastupdated'] = time.time()
+
+    print('INFO: Weather radar metadata updated from ' +
+          radarMetadataCache['provider'] +
+          ' with ' + str(len(paths)) + ' frames')
+
+
+class RadarConfig:
+    """Validated radar configuration with defaults for optional settings."""
+    DEFAULT_BASEMAP = ''
+    DEFAULT_OVERLAY = ''
+    DEFAULT_COLOR = 2
+    DEFAULT_SMOOTH = 1
+    DEFAULT_SNOW = 1
+    DEFAULT_MARKERS = ()
+
+    def __init__(self, radar, myname):
+        try:
+            self.center = radar['center']
+            self.zoom = radar['zoom']
+        except KeyError as exc:
+            raise KeyError(f'Radar config for {myname} is missing required parameter: {exc}') from exc
+
+        self.basemap = radar.get('basemap', self.DEFAULT_BASEMAP)
+        self.overlay = radar.get('overlay', self.DEFAULT_OVERLAY)
+        self.color = radar.get('color', self.DEFAULT_COLOR)
+        self.smooth = radar.get('smooth', self.DEFAULT_SMOOTH)
+        self.snow = radar.get('snow', self.DEFAULT_SNOW)
+        self.markers = radar.get('markers', self.DEFAULT_MARKERS)
+        self.oldcolor = 'oldcolor' in radar
+
+    @staticmethod
+    def marker_image_file(marker):
+        mkfile = marker.get('image', 'teardrop')
+        if os.path.dirname(mkfile) == '':
+            mkfile = os.path.join('markers', mkfile)
+        if os.path.splitext(mkfile)[1] == '':
+            mkfile += '.png'
+        return mkfile
+
+    @staticmethod
+    def marker_height(marker):
+        sizes = {
+            'small': 64,
+            'mid': 70,
+            'tiny': 40
+        }
+        return sizes.get(marker.get('size'), 80)
 
 class Radar(QtWidgets.QLabel):
+    TILE_SIZE = 256
+    DEFAULT_ANIMATION_FRAMES = 5
 
     def __init__(self, parent, radar, rect, myname):
+        super().__init__(parent)
+
         self.myname = myname
         self.rect = rect
-        self.anim = 5
-        self.zoom = radar['zoom']
-        self.point = radar['center']
-        self.radar = radar
-        self.baseurl = self.mapurl(radar, rect, overlayonly=False)
-        print('INFO: map base url for ' + self.myname + ': ' + self.baseurl)
+        self.radar = RadarConfig(radar, myname)
+        self.anim = self.DEFAULT_ANIMATION_FRAMES
+        self.zoom = self.radar.zoom
+        self.point = self.radar.center
 
-        if usemapbox:
-            if 'overlay' in radar:
-                if radar['overlay'] != '':
-                    self.overlayurl = self.mapurl(radar, rect, overlayonly=True)
-                    print('INFO: map overlay url for ' + self.myname + ': ' + self.overlayurl)
+        self._init_urls(rect)
+        self._init_refresh_state()
+        self._init_tile_geometry()
+        self._init_widget()
+        self._init_layers()
+        self._init_frame_state()
+        self._init_request_state()
 
-        QtWidgets.QLabel.__init__(self, parent)
+    def _init_urls(self, rect):
+        self.baseurl = self.mapurl(rect, overlayonly=False)
+        print(f'INFO: map base url for {self.myname}: {safeurl(self.baseurl)}')
+
+        self.overlayurl = ''
+        if usemapbox and self.radar.overlay != '':
+            self.overlayurl = self.mapurl(rect, overlayonly=True)
+            print(f'INFO: map overlay url for {self.myname}: {safeurl(self.overlayurl)}')
+
+    def _init_refresh_state(self):
         self.interval = Config.radar_refresh * 60
-        self.lastwx = 0
-        self.retries = 0
-        self.corners = get_corners(self.point, self.zoom, rect.width(), rect.height())
         self.baseTime = 0
+
+    def _init_widget(self):
+        self.setObjectName('radar')
+        self.setGeometry(self.rect)
+        self.setStyleSheet('#radar { background-color: grey; }')
+        self.setAlignment(Qt.AlignCenter)
+
+    def _make_layer(self, name):
+        layer = QtWidgets.QLabel(self)
+        layer.setObjectName(name)
+        layer.setStyleSheet(f'#{name} {{ background-color: transparent; }}')
+        layer.setGeometry(0, 0, self.rect.width(), self.rect.height())
+        return layer
+
+    def _init_layers(self):
+        self.wwx = self._make_layer('wx')
+        self.overlay = self._make_layer('overlay')
+        self.wmk = self._make_layer('mk')
+        self.timestamp = self._make_layer('timestamp')
+
+    def _init_tile_geometry(self):
+        self.corners = get_corners(
+            self.point,
+            self.zoom,
+            self.rect.width(),
+            self.rect.height()
+        )
         self.cornerTiles = {
-            'NW': get_tile_xy(LatLng(self.corners['N'],
-                                     self.corners['W']), self.zoom),
-            'NE': get_tile_xy(LatLng(self.corners['N'],
-                                     self.corners['E']), self.zoom),
-            'SE': get_tile_xy(LatLng(self.corners['S'],
-                                     self.corners['E']), self.zoom),
-            'SW': get_tile_xy(LatLng(self.corners['S'],
-                                     self.corners['W']), self.zoom)
+            'NW': get_tile_xy(LatLng(self.corners['N'], self.corners['W']), self.zoom),
+            'NE': get_tile_xy(LatLng(self.corners['N'], self.corners['E']), self.zoom),
+            'SE': get_tile_xy(LatLng(self.corners['S'], self.corners['E']), self.zoom),
+            'SW': get_tile_xy(LatLng(self.corners['S'], self.corners['W']), self.zoom),
         }
+
         self.tiles = []
         self.tiletails = []
         self.totalWidth = 0
@@ -1861,68 +2274,53 @@ class Radar(QtWidgets.QLabel):
         self.tilesWidth = 0
         self.tilesHeight = 0
 
-        # base map layer
-        self.setObjectName('radar')
-        self.setGeometry(rect)
-        self.setStyleSheet('#radar { background-color: grey; }')
-        self.setAlignment(Qt.AlignCenter)
+        self._build_tile_lists()
 
-        # weather radar layer
-        self.wwx = QtWidgets.QLabel(self)
-        self.wwx.setObjectName('wx')
-        self.wwx.setStyleSheet('#wx { background-color: transparent; }')
-        self.wwx.setGeometry(0, 0, rect.width(), rect.height())
-
-        # map overlay layer
-        self.overlay = QtWidgets.QLabel(self)
-        self.overlay.setObjectName('overlay')
-        self.overlay.setStyleSheet('#overlay { background-color: transparent; }')
-        self.overlay.setGeometry(0, 0, rect.width(), rect.height())
-
-        # marker layer
-        self.wmk = QtWidgets.QLabel(self)
-        self.wmk.setObjectName('mk')
-        self.wmk.setStyleSheet('#mk { background-color: transparent; }')
-        self.wmk.setGeometry(0, 0, rect.width(), rect.height())
-
-        # timestamp and attribution layer
-        self.timestamp = QtWidgets.QLabel(self)
-        self.timestamp.setObjectName('timestamp')
-        self.timestamp.setStyleSheet('#timestamp { background-color: transparent; }')
-        self.timestamp.setGeometry(0, 0, rect.width(), rect.height())
+    def _build_tile_lists(self):
+        color = self.radar.color
+        smooth = self.radar.smooth
+        snow = self.radar.snow
 
         for y in range(int(self.cornerTiles['NW']['Y']),
                        int(self.cornerTiles['SW']['Y']) + 1):
-            self.totalHeight += 256
+            self.totalHeight += self.TILE_SIZE
             self.tilesHeight += 1
+
             for x in range(int(self.cornerTiles['NW']['X']),
                            int(self.cornerTiles['NE']['X']) + 1):
-                tile = {'X': x, 'Y': y}
-                self.tiles.append(tile)
-                if 'color' not in radar:
-                    radar['color'] = 2
-                if 'smooth' not in radar:
-                    radar['smooth'] = 1
-                if 'snow' not in radar:
-                    radar['snow'] = 1
-                tail = '256/%d/%d/%d/%d/%d_%d.png' % (self.zoom, x, y,
-                                                      radar['color'],
-                                                      radar['smooth'],
-                                                      radar['snow'])
-                if 'oldcolor' in radar:
-                    tail = '256/%d/%d/%d.png?color=%d' % (self.zoom, x, y,
-                                                          radar['color'])
+                self.tiles.append({'X': x, 'Y': y})
+
+                if self.radar.oldcolor:
+                    tail = '/256/%d/%d/%d.png?color=%d' % (
+                        self.zoom,
+                        x,
+                        y,
+                        color
+                    )
+                else:
+                    tail = '/256/%d/%d/%d/%d/%d_%d.png' % (
+                        self.zoom,
+                        x,
+                        y,
+                        color,
+                        smooth,
+                        snow
+                    )
+
                 self.tiletails.append(tail)
+
         for x in range(int(self.cornerTiles['NW']['X']),
                        int(self.cornerTiles['NE']['X']) + 1):
-            self.totalWidth += 256
+            self.totalWidth += self.TILE_SIZE
             self.tilesWidth += 1
+
+    def _init_frame_state(self):
         self.frameImages = []
-        self.frameIndex = 0
         self.displayedFrame = 0
         self.ticker = 0
         self.lastget = 0
 
+    def _init_request_state(self):
         self.getTime = 0
         self.getIndex = 0
         self.tileurls = []
@@ -1934,6 +2332,10 @@ class Radar(QtWidgets.QLabel):
 
     def rtick(self):
         """Update radar display at regular intervals"""
+        if time.time() > (radarMetadataCache.get('lastupdated', 0) +
+                          radarMetadataCache.get('updateinterval', 600)):
+            get_wx_radar_metadata()
+
         if time.time() > (self.lastget + self.interval):
             self.get(int(time.time()))
             self.lastget = time.time()
@@ -1944,12 +2346,11 @@ class Radar(QtWidgets.QLabel):
             if self.ticker < 5:
                 return
         self.ticker = 0
-        try:
-            f = self.frameImages[self.displayedFrame]
-            self.wwx.setPixmap(f['image'])
-            self.timestamp.setPixmap(f['timestamp'])
-        except IndexError:
-            pass
+        if self.displayedFrame < 0 or self.displayedFrame >= len(self.frameImages):
+            self.displayedFrame = 0
+        f = self.frameImages[self.displayedFrame]
+        self.wwx.setPixmap(f['image'])
+        self.timestamp.setPixmap(f['timestamp'])
         self.displayedFrame += 1
         if self.displayedFrame >= len(self.frameImages):
             self.displayedFrame = 0
@@ -1982,6 +2383,17 @@ class Radar(QtWidgets.QLabel):
                 if self.get_tiles(tt):
                     break  # Successfully started fetching, stop loop to wait for async completion
 
+    def _init_request_state(self):
+        self.getTime = 0
+        self.getIndex = 0
+        self.tileurls = []
+        self.tileQimages = []
+        self.tilereply = None
+        self.basereply = None
+        self.timer = None
+        self.overlayreply = None
+        self.tileRetryCount = 0
+
     def get_tiles(self, t, i=0):
         """Build tile URLs from metadata and fetch them
 
@@ -1994,62 +2406,74 @@ class Radar(QtWidgets.QLabel):
         if i == 0:
             self.tileurls = []
             self.tileQimages = []
+            self.tileRetryCount = 0
 
-            # Find the matching radar frame from metadata for this timestamp
             radarpath = self.find_radar_path_for_time(t)
             if not radarpath:
                 print(f'WARNING: {self.myname} no radar data available for time {t}')
-                return False  # No data available, caller should try the next timestamp
+                return False
 
-            host = radarMetadataCache['data'].get('host', 'https://tilecache.rainviewer.com')
+            host = radarMetadataCache.get('host', '')
+            if not host:
+                print(f'WARNING: {self.myname} weather radar metadata has no host')
+                return False
 
-            # Build the tile URLs using the frame path from API and our tile parameters
             for tt in self.tiletails:
-                tileurl = host + radarpath + '/' + tt
+                tileurl = host + radarpath + tt
                 self.tileurls.append(tileurl)
 
-        print(f'INFO: {self.myname} {t} tile{self.getIndex} {self.tileurls[i]}')
+        if self.getIndex >= len(self.tileurls):
+            return False
+
+        print(f'INFO: {self.myname} {t} tile{self.getIndex} {safeurl(self.tileurls[i])}')
         tilereq = QNetworkRequest(QUrl(self.tileurls[i]))
         self.tilereply = manager.get(tilereq)
         self.tilereply.finished.connect(self.get_tilesreply)
-        return True  # Successfully queued for fetching
+        return True
 
-    def find_radar_path_for_time(self, timestamp):
-        """Find the radar path from metadata that matches the requested timestamp
+    def retry_tile_or_abandon_frame(self, reason):
+        """Retry the current radar tile once, then abandon this frame."""
+        print(f'WARNING: {self.myname} {reason} for tile {self.getIndex} at time {self.getTime}')
 
-        Since the API provides 10-minute interval frames, find the closest available frame
+        if self.tileRetryCount < 1:
+            self.tileRetryCount += 1
+            print(f'INFO: {self.myname} retrying tile {self.getIndex} for time {self.getTime}')
+            self.get_tiles(self.getTime, self.getIndex)
+            return
+
+        print(f'WARNING: {self.myname} abandoning radar frame {self.getTime} after failed tile retry')
+        self.tileRetryCount = 0
+        self.tileQimages = []
+        self.tileurls = []
+        self.get()
+
+    @staticmethod
+    def find_radar_path_for_time(timestamp):
+        """Find the radar path from normalized metadata.
+
+        Prefer an exact 10-minute frame. If that is unavailable, use the closest
+        provider frame within five minutes.
         """
-        if not radarMetadataCache['data'] or 'radar' not in radarMetadataCache['data']:
+        paths = radarMetadataCache.get('paths', {})
+        if not paths:
             return None
 
-        past_frames = radarMetadataCache['data']['radar'].get('past', [])
-        if not past_frames:
-            return None
+        timestamp = int(timestamp / 600) * 600
+        if timestamp in paths:
+            return paths[timestamp]
 
-        # Look for the exact match or the closest frame
-        closest_frame = None
+        closest_time = None
         closest_diff = float('inf')
-
-        for frame in past_frames:
-            frame_time = frame.get('time')
-            if frame_time is None:
-                continue
-
+        for frame_time in paths:
             time_diff = abs(frame_time - timestamp)
-
-            # Prefer an exact match or very close match (within 5 minutes of drift)
             if time_diff < closest_diff:
                 closest_diff = time_diff
-                closest_frame = frame
-
-                # If we found an exact match, use it
+                closest_time = frame_time
                 if time_diff == 0:
                     break
 
-        if closest_frame and closest_diff <= 300:  # 5-minute tolerance
-            path = closest_frame.get('path')
-            if path:
-                return path
+        if closest_time is not None and closest_diff <= 300:
+            return paths[closest_time]
 
         return None
 
@@ -2057,15 +2481,28 @@ class Radar(QtWidgets.QLabel):
         """Process the radar tile response"""
         if self.tilereply.error() != QNetworkReply.NoError:
             tilestr = str(self.tilereply.readAll(), 'utf-8')
-            print(f'ERROR: Response from rainviewer.com: {tilestr}')
+            self.tilereply.deleteLater()
+            self.retry_tile_or_abandon_frame(
+                f'error response from weather radar provider: {tilestr}'
+            )
             return
-        self.tileQimages.append(QImage())
-        try:
-            self.tileQimages[self.getIndex].loadFromData(self.tilereply.readAll())
-            self.getIndex += 1
-        except IndexError:
-            print('WARNING:', traceback.format_exc())
-            pass
+
+        tiledata = self.tilereply.readAll()
+        tileimage = QImage()
+
+        if not tileimage.loadFromData(tiledata) or tileimage.isNull():
+            self.tilereply.deleteLater()
+            self.retry_tile_or_abandon_frame('failed to load radar tile image')
+            return
+
+        if tileimage.format() != QImage.Format_ARGB32:
+            tileimage = tileimage.convertToFormat(QImage.Format_ARGB32)
+
+        self.tileQimages.append(tileimage)
+        self.getIndex += 1
+        self.tileRetryCount = 0
+        self.tilereply.deleteLater()
+
         if self.getIndex < len(self.tileurls):
             self.get_tiles(self.getTime, self.getIndex)
         else:
@@ -2075,7 +2512,7 @@ class Radar(QtWidgets.QLabel):
     def combine_tiles(self):
         """Combine the radar tiles into a single image"""
         ii = QImage(self.tilesWidth * 256, self.tilesHeight * 256, QImage.Format_ARGB32)
-        ii.fill(Qt.transparent)
+        ii.fill(Qt.transparent)  # initialize the image to be blank, otherwise it could contain garbage from old tiles
         painter = QPainter()
         painter.begin(ii)
         i = 0
@@ -2086,7 +2523,7 @@ class Radar(QtWidgets.QLabel):
         for y in range(0, self.totalHeight, 256):
             for x in range(0, self.totalWidth, 256):
                 try:
-                    if self.tileQimages[i].format() == QImage.Format_ARGB32:
+                    if not self.tileQimages[i].isNull():
                         painter.drawImage(x, y, self.tileQimages[i])
                     i += 1
                 except IndexError:
@@ -2094,97 +2531,145 @@ class Radar(QtWidgets.QLabel):
                     pass
         painter.end()
         self.tileQimages = []
-        ii2 = QPixmap(ii.copy(-xo, -yo, self.rect.width(), self.rect.height()))
-        # finish weather radar image
 
-        # create timestamp layer
-        ii3 = ii.copy(-xo, -yo, self.rect.width(), self.rect.height())
-        ii3.fill(Qt.transparent)
-        painter2 = QPainter()
-        painter2.begin(ii3)
-        timestamp = '{0:%H:%M} RainViewer.com'.format(datetime.datetime.fromtimestamp(self.getTime))
-        painter2.setPen(QColor(63, 63, 63, 255))
-        painter2.setFont(QFont("Arial", pointSize=8, weight=75))
-        painter2.setRenderHint(QPainter.TextAntialiasing)
-        painter2.drawText(3 - 1, 12 - 1, timestamp)
-        painter2.drawText(3 + 2, 12 + 1, timestamp)
-        painter2.setPen(QColor(255, 255, 255, 255))
-        painter2.drawText(3, 12, timestamp)
-        painter2.drawText(3 + 1, 12, timestamp)
-        painter2.end()
-        ts = QPixmap(ii3)
-        # finish timestamp layer
+        frame_image = ii.copy(-xo, -yo, self.rect.width(), self.rect.height())
+        radar_pixmap = QPixmap(frame_image)
+        timestamp_pixmap = self.render_timestamp(frame_image.size())
 
-        self.frameImages.append({'time': self.getTime, 'image': ii2, 'timestamp': ts})
+        self.frameImages.append({
+            'time': self.getTime,
+            'image': radar_pixmap,
+            'timestamp': timestamp_pixmap
+        })
 
-    def mapurl(self, radar, rect, overlayonly):
+    def render_timestamp(self, size):
+        """Create the timestamp label layer for a radar frame."""
+        image = QImage(size, QImage.Format_ARGB32)
+        image.fill(Qt.transparent)
+
+        painter = QPainter()
+        painter.begin(image)
+        provider = radarMetadataCache.get('provider', 'Weather Radar')
+        timestamp = '{0:%H:%M} {1}'.format(datetime.datetime.fromtimestamp(self.getTime), provider)
+        painter.setPen(QColor(63, 63, 63, 255))
+        painter.setFont(QFont("Arial", pointSize=8, weight=75))
+        painter.setRenderHint(QPainter.TextAntialiasing)
+        painter.drawText(3 - 1, 12 - 1, timestamp)
+        painter.drawText(3 + 2, 12 + 1, timestamp)
+        painter.setPen(QColor(255, 255, 255, 255))
+        painter.drawText(3, 12, timestamp)
+        painter.drawText(3 + 1, 12, timestamp)
+        painter.end()
+
+        return QPixmap(image)
+
+    def mapurl(self, rect, overlayonly):
+        """
+        Constructs and returns a URL based on the radar configuration, geographical
+        bounds, and overlay option. The returned URL is determined by the overlay setting
+        and external services like Mapbox or Google Maps.
+        """
+        if overlayonly:
+            if usemapbox and self.radar.overlay != '':
+                return self.mapboxoverlayurl(self.radar, rect)
+            return ''
+
         if usemapbox:
-            if overlayonly:
-                return self.mapboxoverlayurl(radar, rect)
-            else:
-                return self.mapboxbaseurl(radar, rect)
-        else:
-            return self.googlemapurl(radar, rect)
+            return self.mapboxbaseurl(self.radar, rect)
+
+        return self.googlemapurl(self.radar, rect)
+
+    @staticmethod
+    def mapbox_base_style(radar):
+        """Return the Mapbox base style for this radar."""
+        return radar.basemap or 'mapbox/satellite-streets-v12'
+
+    @staticmethod
+    def google_base_style(radar):
+        """Return the Google Static Maps map type for this radar."""
+        return radar.basemap or 'hybrid'
 
     @staticmethod
     def mapboxbaseurl(radar, rect):
-        #  note we're using Google Maps zoom factor.
-        #  Mapbox equivalent zoom is one less
-        #  They seem to be using 512x512 tiles instead of 256x256
-        basemap = 'mapbox/satellite-streets-v12'
+        """
+        Constructs and returns a MapBox Static Tiles API URL for generating a classic map
+        image based on the given radar config information and map dimensions.
+        It uses the Google Maps zoom level system, adjusted by subtracting one for MapBox,
+        which employs 512x512 tiles instead of 256x256.
+        """
+        if not hasattr(ApiKeys, 'mbapi'):
+            return ''
+
+        mbapi = ApiKeys.mbapi
+        basemap = Radar.mapbox_base_style(radar)
+
+        # if an overlay is specified, hide attribution on this base map
         hide_attribution = ''
-        if 'basemap' in radar:
-            if radar['basemap'] != '':
-                basemap = radar['basemap']
-        if 'overlay' in radar:
-            if radar['overlay'] != '':
-                hide_attribution = '&attribution=false&logo=false'
+        if radar.overlay != '':
+            hide_attribution = '&attribution=false&logo=false'
+
         return 'https://api.mapbox.com/styles/v1/' + \
             basemap + \
             '/static/' + \
-            str(radar['center'].lng) + ',' + \
-            str(radar['center'].lat) + ',' + \
-            str(radar['zoom'] - 1) + ',0,0/' + \
+            str(radar.center.lng) + ',' + \
+            str(radar.center.lat) + ',' + \
+            str(radar.zoom - 1) + ',0,0/' + \
             str(rect.width()) + 'x' + str(rect.height()) + \
-            '?access_token=' + ApiKeys.mbapi + \
+            '?access_token=' + mbapi + \
             hide_attribution
 
     @staticmethod
     def mapboxoverlayurl(radar, rect):
-        #  note we're using Google Maps zoom factor.
-        #  Mapbox equivalent zoom is one less
-        #  They seem to be using 512x512 tiles instead of 256x256
-        overlay = ''
-        if 'overlay' in radar:
-            if radar['overlay'] != '':
-                overlay = radar['overlay']
+        """
+        Constructs and returns a MapBox Static Tiles API URL for generating an overlay map
+        image based on the given radar config information and map dimensions.
+        It uses the Google Maps zoom level system, adjusted by subtracting one for MapBox,
+        which employs 512x512 tiles instead of 256x256.
+        """
+        if not hasattr(ApiKeys, 'mbapi'):
+            return ''
+
+        mbapi = ApiKeys.mbapi
+
+        if radar.overlay == '':
+            return ''
+
         return 'https://api.mapbox.com/styles/v1/' + \
-            overlay + \
+            radar.overlay + \
             '/static/' + \
-            str(radar['center'].lng) + ',' + \
-            str(radar['center'].lat) + ',' + \
-            str(radar['zoom'] - 1) + ',0,0/' + \
+            str(radar.center.lng) + ',' + \
+            str(radar.center.lat) + ',' + \
+            str(radar.zoom - 1) + ',0,0/' + \
             str(rect.width()) + 'x' + str(rect.height()) + \
-            '?access_token=' + ApiKeys.mbapi
+            '?access_token=' + mbapi
 
     @staticmethod
     def googlemapurl(radar, rect):
-        urlp = []
-        if len(ApiKeys.googleapi) > 0:
-            urlp.append('key=' + ApiKeys.googleapi)
-        urlp.append(
-            'center=' + str(radar['center'].lat) +
-            ',' + str(radar['center'].lng))
-        zoom = radar['zoom']
+        """
+        Constructs and returns a Google Maps Static API URL for generating a static map
+        image based on the given radar config information and map dimensions. The method
+        adjusts the size of the resulting image if it exceeds the maximum allowed
+        dimensions of 640x640 pixels, and adjusts the zoom level accordingly.
+        """
+        zoom = radar.zoom
         rsize = rect.size()
+
         if rsize.width() > 640 or rsize.height() > 640:
             rsize = QtCore.QSize(int(rsize.width() / 2), int(rsize.height() / 2))
             zoom -= 1
-        urlp.append('zoom=' + str(zoom))
-        urlp.append('size=' + str(rsize.width()) + 'x' + str(rsize.height()))
-        urlp.append('maptype=hybrid')
 
-        return 'http://maps.googleapis.com/maps/api/staticmap?' + \
+        urlp = [
+            'center=' + str(radar.center.lat) + ',' + str(radar.center.lng),
+            'zoom=' + str(zoom),
+            'size=' + str(rsize.width()) + 'x' + str(rsize.height()),
+            'maptype=' + Radar.google_base_style(radar)
+        ]
+
+        googleapi = getattr(ApiKeys, 'googleapi', '')
+        if googleapi:
+            urlp.insert(0, 'key=' + googleapi)
+
+        return 'https://maps.googleapis.com/maps/api/staticmap?' + \
             '&'.join(urlp)
 
     def basefinished(self):
@@ -2205,54 +2690,75 @@ class Radar(QtWidgets.QLabel):
         if basepixmap.size() != self.rect.size():
             basepixmap = basepixmap.scaled(self.rect.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.setPixmap(basepixmap)
+        self.wmk.setPixmap(self.render_markers(basepixmap.size()))
 
-        # make marker pixmap
-        mkpixmap = QPixmap(basepixmap.size())
+    def render_markers(self, size):
+        """Create the dimmed marker layer for this radar."""
+        mkpixmap = QPixmap(size)
         mkpixmap.fill(Qt.transparent)
-        br = QBrush(QColor(Config.dimcolor))
+
         painter = QPainter()
         painter.begin(mkpixmap)
-        painter.fillRect(0, 0, mkpixmap.width(),
-                         mkpixmap.height(), br)
-        for marker in self.radar['markers']:
-            if 'visible' not in marker or marker['visible'] == 1:
-                pt = get_point(marker['location'], self.point, self.zoom,
-                               self.rect.width(), self.rect.height())
-                mk2 = QImage()
-                mkfile = 'teardrop'
-                if 'image' in marker:
-                    mkfile = marker['image']
-                if os.path.dirname(mkfile) == '':
-                    mkfile = os.path.join('markers', mkfile)
-                if os.path.splitext(mkfile)[1] == '':
-                    mkfile += '.png'
-                mk2.load(mkfile)
-                if mk2.format != QImage.Format_ARGB32:
-                    mk2 = mk2.convertToFormat(QImage.Format_ARGB32)
-                mkh = 80  # self.rect.height() / 5
-                if 'size' in marker:
-                    if marker['size'] == 'small':
-                        mkh = 64
-                    if marker['size'] == 'mid':
-                        mkh = 70
-                    if marker['size'] == 'tiny':
-                        mkh = 40
-                if 'color' in marker:
-                    c = QColor(marker['color'])
-                    (cr, cg, cb, ca) = c.getRgbF()
-                    for x in range(0, mk2.width()):
-                        for y in range(0, mk2.height()):
-                            (r, g, b, a) = QColor.fromRgba(mk2.pixel(x, y)).getRgbF()
-                            r = r * cr
-                            g = g * cg
-                            b = b * cb
-                            mk2.setPixel(x, y, QColor.fromRgbF(r, g, b, a).rgba())
-                mk2 = mk2.scaledToHeight(mkh, 1)
-                painter.drawImage(int(pt.x - mkh / 2), int(pt.y - mkh / 2), mk2)
+        painter.fillRect(
+            0,
+            0,
+            mkpixmap.width(),
+            mkpixmap.height(),
+            QBrush(QColor(Config.dimcolor))
+        )
+
+        for marker in self.radar.markers:
+            self.draw_marker(painter, marker)
 
         painter.end()
+        return mkpixmap
 
-        self.wmk.setPixmap(mkpixmap)
+    def draw_marker(self, painter, marker):
+        """Draw a single configured marker onto the marker layer."""
+        if marker.get('visible', 1) != 1:
+            return
+
+        pt = get_point(
+            marker['location'],
+            self.point,
+            self.zoom,
+            self.rect.width(),
+            self.rect.height()
+        )
+        marker_image = self.load_marker_image(marker)
+        marker_height = self.radar.marker_height(marker)
+
+        marker_image = marker_image.scaledToHeight(marker_height, 1)
+        painter.drawImage(
+            int(pt.x - marker_height / 2),
+            int(pt.y - marker_height / 2),
+            marker_image
+        )
+
+    def load_marker_image(self, marker):
+        """Load, normalize, and optionally recolor a marker image."""
+        marker_image = QImage()
+        marker_image.load(self.radar.marker_image_file(marker))
+
+        if marker_image.format != QImage.Format_ARGB32:
+            marker_image = marker_image.convertToFormat(QImage.Format_ARGB32)
+
+        if 'color' in marker:
+            self.recolor_marker(marker_image, QColor(marker['color']))
+
+        return marker_image
+
+    @staticmethod
+    def recolor_marker(marker_image, color):
+        """Tint a marker image by multiplying RGB channels by the configured color."""
+        cr, cg, cb, ca = color.getRgbF()
+        for x in range(0, marker_image.width()):
+            for y in range(0, marker_image.height()):
+                r, g, b, a = QColor.fromRgba(marker_image.pixel(x, y)).getRgbF()
+                r = r * cr
+                g = g * cg
+                b = b * cb
+                marker_image.setPixel(x, y, QColor.fromRgbF(r, g, b, a).rgba())
 
     def overlayfinished(self):
         if self.overlayreply.error() != QNetworkReply.NoError:
@@ -2274,13 +2780,11 @@ class Radar(QtWidgets.QLabel):
         self.overlay.setPixmap(overlaypixmap)
 
     def getbase(self):
-        global manager
         basereq = QNetworkRequest(QUrl(self.baseurl))
         self.basereply = manager.get(basereq)
         self.basereply.finished.connect(self.basefinished)
 
     def getoverlay(self):
-        global manager
         overlayreq = QNetworkRequest(QUrl(self.overlayurl))
         self.overlayreply = manager.get(overlayreq)
         self.overlayreply.finished.connect(self.overlayfinished)
@@ -2291,10 +2795,8 @@ class Radar(QtWidgets.QLabel):
             self.interval = interval
         self.getbase()
 
-        if usemapbox:
-            if 'overlay' in self.radar:
-                if self.radar['overlay'] != '':
-                    self.getoverlay()
+        if usemapbox and self.radar.overlay != '':
+            self.getoverlay()
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.rtick)
@@ -2322,9 +2824,6 @@ def realquit():
 
 
 def myquit(signum, frame):
-    global objradar1, objradar2, objradar3, objradar4
-    global ctimer, wxtimer, temptimer
-
     objradar1.stop()
     objradar2.stop()
     objradar3.stop()
@@ -2359,7 +2858,7 @@ def fixupframe(frame, onoff):
 
 
 def nextframe(plusminus):
-    global frames, framep
+    global framep
     frames[framep].setVisible(False)
     fixupframe(frames[framep], onoff=False)
     framep += plusminus
@@ -2438,6 +2937,16 @@ try:
     Config.radar_refresh
 except AttributeError:
     Config.radar_refresh = 10  # minutes
+
+try:
+    Config.userainviewer
+except AttributeError:
+    Config.userainviewer = 0
+
+try:
+    Config.useopenmeteo
+except AttributeError:
+    Config.useopenmeteo = 0
 
 try:
     Config.fontattr
