@@ -6,15 +6,21 @@ The PiClock is a clock (duh), weather forcast, and radar map display
 based on the Raspberry Pi and a display monitor. The display monitor is
 assumed to be an HDMI monitor, but it will probably (possibly) work with
 the composite output as well, but this is not a design goal.  The main
-program (Clock/PyQtPiClock.py) will also run on Windows, Mac, and Linux,
+program `Clock/PyQtPiClock.py` will also run on Windows, Mac, and Linux,
 as long as Python 3 and PyQt5 is installed.
 
-The current weather and forcast data comes from your choice of either
-OpenWeather (https://openweathermap.org/) or Tomorrow (https://www.tomorrow.io/).
-The maps come from your choice of either Mapbox (https://mapbox.com/) or 
-Google Maps (https://developers.google.com/maps).
-**You must get API keys from one each of those weather and map services in order to make
-this work.** They offer free subscription plans for low-usage projects such as this application.
+Radar comes from [LibreWXR](https://librewxr.net/), 
+while [RainViewer](https://www.rainviewer.com/) is selectable in your `Config.py` via the `userainviewer` setting.
+
+The current weather conditions and forecasts come from METAR and/or [Open-Meteo](https://open-meteo.com/) so no weather signup is needed, 
+unless you put an API key in your `ApiKeys.py` for [OpenWeatherMap](https://openweathermap.org/price) or
+[Tomorrow.io](https://www.tomorrow.io/weather-api/).
+They offer free subscription plans for low-usage projects such as this application.
+
+An API key is still required for either [MapBox](https://account.mapbox.com/auth/signup/) or 
+[Google Maps](https://developers.google.com/maps/documentation/maps-static/overview) 
+in your `ApiKeys.py` for the maps under/over the radar.
+They offer free subscription plans for low-usage projects such as this application.
 
 The PiClock can be customized with several supported additional things:
   * RGB LED strips (NeoPixel) to create an ambilight effect

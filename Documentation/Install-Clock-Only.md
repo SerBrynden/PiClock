@@ -42,8 +42,13 @@ select **Download ZIP**, then unzip it onto your system.
 
 ### Configure the PiClock API keys
 
-You need to set API keys for one weather service and one map service.
-These are free unless you have large volume.
+The current weather conditions and forecasts come from METAR and/or [Open-Meteo](https://open-meteo.com/) 
+so no weather signup is required, unless you decide to use either 
+[OpenWeatherMap](https://openweathermap.org/price) or
+[Tomorrow.io](https://www.tomorrow.io/weather-api/).
+
+However, an API key for one map service is **required**.
+Keys are free unless you have large volume.
 The PiClock usage is well below the maximums imposed by the no cost API keys.
 
 _Protect your API keys._  You'd be surprised how many pastebin's are out
@@ -53,51 +58,51 @@ has the ability to add referer, device and IP requirements on your API key.  It
 can also allow you to limit an API key to specific applications only (static-maps)
 in this case. Also, you might consider disabling all the other APIs on your
 project dashboard. Under the Billing section of things you can set up budgets
-and alerts (set to like $1.00).
+and alerts (set to like \$1.00).
 
-#### Weather API Key
+#### Optional Weather API Key
 
-You have your choice of OpenWeather or Tomorrow from which to get your 
+If not using Open-Meteo, you have your choice of OpenWeatherMap or Tomorrow.io from which to get your 
 current weather and forcast data.
-You only need one or the other (owmapi or tmapi)
+You only need one or the other (`owmapi` or `tmapi` in your `ApiKeys.py` file))
 
-#### OpenWeather API key
+#### OpenWeatherMap API key
 
-An OpenWeather API key is required to use OpenWeather data.
+An OpenWeatherMap API key is required to use OpenWeatherMap data.
 
-OpenWeather API keys are created by signing up at this link:
+OpenWeatherMap API keys are created by signing up at this link:
 https://openweathermap.org/price
 
 Select either the One Call by Call API 3.0 subscription plan, or scroll down for the 
 Professional Collections current weather and forecasts free plan.
 
-The OpenWeather One Call by Call API 3.0 key requires a credit card which won't be charged 
+The OpenWeatherMap One Call by Call API 3.0 key requires a credit card which won't be charged 
 unless usage is high. If you subscribe to the One Call API 3.0 plan, the default call limit is set 
 to 2,000 API calls per day, however only the first 1,000 calls are free, which 
 you should not exceed under typical PiClock operation.
-After the daily limit is reached, the overage charge is $0.15 per 100 calls.
+After the daily limit is reached, the overage charge is \$0.15 per 100 calls.
 To be safe, it is recommended you change the daily limit by going to the 
-"Billing plans" tab in your OpenWeather Personal account, and change the standard 
+"Billing plans" tab in your OpenWeatherMap Personal account, and change the standard 
 "Calls per day (no more than)" setting to 1,000 calls.
 
-#### Tomorrow API key
+#### Tomorrow.io API key
 
-A Tomorrow API key is required to use Tomorrow weather data.
+A Tomorrow.io API key is required to use Tomorrow.io weather data.
 
-Tomorrow API keys are created by signing up at this link:
+Tomorrow.io API keys are created by signing up at this link:
 https://www.tomorrow.io/weather-api/
 
-#### Map API Key
+#### Required Map API Key
 
-You have your choice of Mapbox or Google Maps from which to get your underlying maps.
-You only need one or the other (mbapi or googleapi)
+You have your choice of MapBox or Google Maps from which to get your underlying maps.
+You only need one or the other (`mbapi` or `googleapi` in your `ApiKeys.py` file)
 
-#### Mapbox API key
+#### MapBox API key
 
-A Mapbox API key (access token) is required to use Mapbox.
+A MapBox API key (access token) is required to use MapBox.
 
-Mapbox access tokens are created by signing up at this link:
-https://www.mapbox.com/signup/
+MapBox access tokens are created by signing up at this link:
+https://account.mapbox.com/auth/signup/
 
 #### Google Maps API key
 
@@ -105,12 +110,11 @@ A Google Maps API key is required to use Google Maps.
 (Requires credit card which won't be charged unless usage is high.)
 
 An intro to Google static maps API keys, and a link to creating your account and API keys:
-https://developers.google.com/maps/documentation/maps-static/intro
+https://developers.google.com/maps/documentation/maps-static/overview
 You'll require a Google user and password.  It'll also require a credit card.
 The credit card should not be charged, because my reading of
-https://cloud.google.com/maps-platform/pricing/sheet/ the $200.00 credit will
-apply, and your charges incurred will be for 31 map pulls per month will be
-$0.62 , if you reboot daily.
+https://mapsplatform.google.com/pricing/#pay-as-you-go you get 10,000 free map calls 
+per month, which is more than sufficient, even if you reboot daily.
 You'll be required to create a "project" (maybe PiClock for a project name?)
 You need to then activate the key.
 
@@ -121,19 +125,22 @@ cd PiClock/Clock
 cp ApiKeys-example.py ApiKeys.py
 nano ApiKeys.py
 ```
-Put your API keys in the file as indicated. Comment out the lines of unused API keys.
+
+Put your API keys in the file as indicated.  Comment out the lines of unused API keys.
+
 ```
 # Change this to your API keys
+# comment out unused settings
 
-# Map API keys -- only need 1 of the following
-# Google Maps API key (if usemapbox is not set in Config)
-googleapi = 'YOUR GOOGLE MAPS API KEY'
-# Mapbox API key (access_token) [if usemapbox is set in Config]
-mbapi = 'YOUR MAPBOX ACCESS TOKEN'
+# Required Map API keys -- only need 1 of the following
+# If you want to use Google Maps, uncomment and add API key
+# googleapi = 'YOUR GOOGLE MAPS API KEY'
+# If you want to use MapBox, uncomment and add API key (access_token)
+# mbapi = 'YOUR MAPBOX ACCESS TOKEN'
 
-# Weather API key -- only need 1 of the following
+# Optional weather API key -- no more than one (if useopenmeteo = 0 in Config)
 # If you want to use OpenWeatherMap.org, uncomment and add API key
-owmapi = 'YOUR OPENWEATHERMAP API KEY'
+# owmapi = 'YOUR OPENWEATHERMAP API KEY'
 # If you want to use Tomorrow.io, uncomment and add API key
 # tmapi = 'YOUR TOMORROW API KEY'
 ```
